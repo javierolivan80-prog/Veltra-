@@ -1,68 +1,77 @@
-import { getDb } from "@/src/lib/db/client";
-import { getExercise } from "@/src/features/exercises/repo";
-import { checkAndRecordPRs } from "@/src/features/exercises/prs";
-import { getProfile } from "@/src/features/profile/repo";
-import { generateId } from "@/src/lib/id";
-import { enqueueMutation } from "@/src/lib/sync/queue";
-import type { PersonalRecord, SetEntry, WorkoutSession } from "@/src/types/models";
-
-function mapSession(r: any): WorkoutSession {
-  return {
-    id: r.id,
-    routineId: r.routine_id,
-    routineName: r.routine_name,
-    status: r.status,
-    startedAt: r.started_at,
-    endedAt: r.ended_at,
-  };
-}
-
-function mapSet(r: any): SetEntry {
-  return {
-    id: r.id,
-    sessionId: r.session_id,
-    exerciseId: r.exercise_id,
-    setNumber: r.set_number,
-    weightKg: r.weight_kg,
-    reps: r.reps,
-    rir: r.rir,
-    rpe: r.rpe,
-    isWarmup: !!r.is_warmup,
-    completedAt: r.completed_at,
-  };
-}
+import { getDb } from "@/lib/db/client";
+import { getExercise } from "@/features/exercises/repo";
+import { checkAndRecordPRs } from "@/features/exercises/prs";
+import { getProfile } from "@/features/profile/repo";
+import { generateId } from "@/lib/id";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { toCamelCase, toSnakeCase } from "@/lib/supabase/case";
+import { requireUserId } from "@/lib/supabase/currentUser";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
+import type { PersonalRecord, SetEntry, WorkoutSession } from "@/types/models";
 
 export async function getActiveSession(): Promise<WorkoutSession | null> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data, error } = await supabase.from("workout_sessions").select("*").eq("status", "active").order("started_at", { ascending: false }).limit(1).maybeSingle();
+    if (error || !data) return null;
+    return toCamelCase<WorkoutSession>(data);
+  }
   const db = await getDb();
-  const row = await db.getFirstAsync<any>(`SELECT * FROM workout_sessions WHERE status = 'active' ORDER BY started_at DESC LIMIT 1`);
-  return row ? mapSession(row) : null;
+  const all = await db.getAllFromIndex("workoutSessions", "status", "active");
+  if (all.length === 0) return null;
+  return all.sort((a, b) => b.startedAt.localeCompare(a.startedAt))[0];
 }
 
 export async function startSession(routineId: string | null, routineName: string | null): Promise<WorkoutSession> {
-  const db = await getDb();
   const id = generateId();
   const now = new Date().toISOString();
-  await db.runAsync(`INSERT INTO workout_sessions (id, routine_id, routine_name, status, started_at, ended_at) VALUES (?, ?, ?, 'active', ?, NULL)`, [
-    id,
-    routineId,
-    routineName,
-    now,
-  ]);
-  await enqueueMutation("workout_sessions", id, "upsert");
-  return { id, routineId, routineName, status: "active", startedAt: now, endedAt: null };
+  const session: WorkoutSession = { id, routineId, routineName, status: "active", startedAt: now, endedAt: null };
+
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const userId = await requireUserId();
+    const { error } = await supabase.from("workout_sessions").insert({ ...toSnakeCase(session), user_id: userId });
+    if (error) throw error;
+  } else {
+    const db = await getDb();
+    await db.put("workoutSessions", session);
+  }
+  return session;
 }
 
 export async function endSession(id: string, status: "completed" | "discarded" = "completed"): Promise<void> {
-  const db = await getDb();
   const now = new Date().toISOString();
-  await db.runAsync(`UPDATE workout_sessions SET status = ?, ended_at = ? WHERE id = ?`, [status, now, id]);
-  await enqueueMutation("workout_sessions", id, "upsert");
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    await supabase.from("workout_sessions").update({ status, ended_at: now }).eq("id", id);
+    return;
+  }
+  const db = await getDb();
+  const existing = await db.get("workoutSessions", id);
+  if (existing) await db.put("workoutSessions", { ...existing, status, endedAt: now });
+}
+
+export async function getSession(id: string): Promise<WorkoutSession | null> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data, error } = await supabase.from("workout_sessions").select("*").eq("id", id).maybeSingle();
+    if (error || !data) return null;
+    return toCamelCase<WorkoutSession>(data);
+  }
+  const db = await getDb();
+  return (await db.get("workoutSessions", id)) ?? null;
 }
 
 export async function getSessionSets(sessionId: string): Promise<SetEntry[]> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data, error } = await supabase.from("set_entries").select("*").eq("session_id", sessionId).order("completed_at", { ascending: true });
+    if (error || !data) return [];
+    return data.map((r: any) => toCamelCase<SetEntry>(r));
+  }
   const db = await getDb();
-  const rows = await db.getAllAsync<any>(`SELECT * FROM set_entries WHERE session_id = ? ORDER BY completed_at ASC`, [sessionId]);
-  return rows.map(mapSet);
+  const all = await db.getAllFromIndex("setEntries", "sessionId", sessionId);
+  return all.sort((a, b) => a.completedAt.localeCompare(b.completedAt));
 }
 
 export interface AddSetInput {
@@ -81,34 +90,43 @@ export interface AddSetResult {
 }
 
 export async function addSet(input: AddSetInput): Promise<AddSetResult> {
-  const db = await getDb();
   const exercise = await getExercise(input.exerciseId);
   if (!exercise) throw new Error("Exercise not found");
 
-  const countRow = await db.getFirstAsync<{ count: number }>(`SELECT COUNT(*) as count FROM set_entries WHERE session_id = ? AND exercise_id = ?`, [
-    input.sessionId,
-    input.exerciseId,
-  ]);
-  const setNumber = (countRow?.count ?? 0) + 1;
+  const existingSets = await getSessionSets(input.sessionId);
+  const sameExerciseSets = existingSets.filter((s) => s.exerciseId === input.exerciseId);
+  const setNumber = sameExerciseSets.length + 1;
   const id = generateId();
   const completedAt = new Date().toISOString();
 
-  await db.runAsync(
-    `INSERT INTO set_entries (id, session_id, exercise_id, set_number, weight_kg, reps, rir, rpe, is_warmup, completed_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    [id, input.sessionId, input.exerciseId, setNumber, input.weightKg, input.reps, input.rir, input.rpe, input.isWarmup ? 1 : 0, completedAt]
-  );
-  await enqueueMutation("set_entries", id, "upsert");
+  const set: SetEntry = {
+    id,
+    sessionId: input.sessionId,
+    exerciseId: input.exerciseId,
+    setNumber,
+    weightKg: input.weightKg,
+    reps: input.reps,
+    rir: input.rir,
+    rpe: input.rpe,
+    isWarmup: input.isWarmup ?? false,
+    completedAt,
+  };
 
-  const sessionSets = await db.getAllAsync<any>(`SELECT weight_kg, reps FROM set_entries WHERE session_id = ? AND exercise_id = ?`, [
-    input.sessionId,
-    input.exerciseId,
-  ]);
-  const sessionVolumeSoFar = sessionSets.reduce((sum, s) => sum + s.weight_kg * s.reps, 0);
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const userId = await requireUserId();
+    const { error } = await supabase.from("set_entries").insert({ ...toSnakeCase(set), user_id: userId });
+    if (error) throw error;
+  } else {
+    const db = await getDb();
+    await db.put("setEntries", set);
+  }
 
+  const sessionVolumeSoFar = [...sameExerciseSets, set].reduce((sum, s) => sum + s.weightKg * s.reps, 0);
   const profile = await getProfile();
   const prsBroken = input.isWarmup
     ? []
-    : await checkAndRecordPRs(db, {
+    : await checkAndRecordPRs({
         setId: id,
         exercise,
         weightKg: input.weightKg,
@@ -118,74 +136,80 @@ export async function addSet(input: AddSetInput): Promise<AddSetResult> {
         sessionVolumeSoFar,
       });
 
-  return { set: mapSet({ id, session_id: input.sessionId, exercise_id: input.exerciseId, set_number: setNumber, weight_kg: input.weightKg, reps: input.reps, rir: input.rir, rpe: input.rpe, is_warmup: input.isWarmup ? 1 : 0, completed_at: completedAt }), prsBroken };
+  return { set, prsBroken };
 }
 
 export async function deleteSet(id: string): Promise<void> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    await supabase.from("set_entries").delete().eq("id", id);
+    return;
+  }
   const db = await getDb();
-  await db.runAsync(`DELETE FROM set_entries WHERE id = ?`, [id]);
-  await enqueueMutation("set_entries", id, "delete");
+  await db.delete("setEntries", id);
 }
 
 export async function updateSet(id: string, input: Partial<Pick<SetEntry, "weightKg" | "reps" | "rir" | "rpe">>): Promise<void> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    await supabase.from("set_entries").update(toSnakeCase(input)).eq("id", id);
+    return;
+  }
   const db = await getDb();
-  const existing = await db.getFirstAsync<any>(`SELECT * FROM set_entries WHERE id = ?`, [id]);
-  if (!existing) return;
-  await db.runAsync(`UPDATE set_entries SET weight_kg = ?, reps = ?, rir = ?, rpe = ? WHERE id = ?`, [
-    input.weightKg ?? existing.weight_kg,
-    input.reps ?? existing.reps,
-    input.rir !== undefined ? input.rir : existing.rir,
-    input.rpe !== undefined ? input.rpe : existing.rpe,
-    id,
-  ]);
-  await enqueueMutation("set_entries", id, "upsert");
+  const existing = await db.get("setEntries", id);
+  if (existing) await db.put("setEntries", { ...existing, ...input });
 }
 
-/** The last completed (non-warmup) set for this exercise, anywhere — powers the "remember last weight/reps/RIR/RPE" prefill. */
 export async function getLastSetForExercise(exerciseId: string, excludeSessionId?: string): Promise<SetEntry | null> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    let query = supabase.from("set_entries").select("*").eq("exercise_id", exerciseId).eq("is_warmup", false).order("completed_at", { ascending: false }).limit(excludeSessionId ? 5 : 1);
+    const { data, error } = await query;
+    if (error || !data || data.length === 0) return null;
+    const filtered = excludeSessionId ? data.filter((r: any) => r.session_id !== excludeSessionId) : data;
+    return filtered.length > 0 ? toCamelCase<SetEntry>(filtered[0]) : null;
+  }
   const db = await getDb();
-  const row = await db.getFirstAsync<any>(
-    `SELECT * FROM set_entries WHERE exercise_id = ? AND is_warmup = 0 ${excludeSessionId ? "AND session_id != ?" : ""} ORDER BY completed_at DESC LIMIT 1`,
-    excludeSessionId ? [exerciseId, excludeSessionId] : [exerciseId]
-  );
-  return row ? mapSet(row) : null;
+  const all = await db.getAllFromIndex("setEntries", "exerciseId", exerciseId);
+  const filtered = all.filter((s) => !s.isWarmup && (!excludeSessionId || s.sessionId !== excludeSessionId));
+  if (filtered.length === 0) return null;
+  return filtered.sort((a, b) => b.completedAt.localeCompare(a.completedAt))[0];
 }
 
 export async function getSetsForExercise(exerciseId: string): Promise<SetEntry[]> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data, error } = await supabase.from("set_entries").select("*").eq("exercise_id", exerciseId).order("completed_at", { ascending: true });
+    if (error || !data) return [];
+    return data.map((r: any) => toCamelCase<SetEntry>(r));
+  }
   const db = await getDb();
-  const rows = await db.getAllAsync<any>(`SELECT * FROM set_entries WHERE exercise_id = ? ORDER BY completed_at ASC`, [exerciseId]);
-  return rows.map(mapSet);
+  const all = await db.getAllFromIndex("setEntries", "exerciseId", exerciseId);
+  return all.sort((a, b) => a.completedAt.localeCompare(b.completedAt));
 }
 
 export async function listRecentSessions(limit = 10): Promise<WorkoutSession[]> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data, error } = await supabase.from("workout_sessions").select("*").eq("status", "completed").order("started_at", { ascending: false }).limit(limit);
+    if (error || !data) return [];
+    return data.map((r: any) => toCamelCase<WorkoutSession>(r));
+  }
   const db = await getDb();
-  const rows = await db.getAllAsync<any>(`SELECT * FROM workout_sessions WHERE status = 'completed' ORDER BY started_at DESC LIMIT ?`, [limit]);
-  return rows.map(mapSession);
-}
-
-export async function getSession(id: string): Promise<WorkoutSession | null> {
-  const db = await getDb();
-  const row = await db.getFirstAsync<any>(`SELECT * FROM workout_sessions WHERE id = ?`, [id]);
-  return row ? mapSession(row) : null;
+  const all = await db.getAllFromIndex("workoutSessions", "status", "completed");
+  return all.sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, limit);
 }
 
 export async function getExerciseIdsInSession(sessionId: string): Promise<string[]> {
-  const db = await getDb();
-  const rows = await db.getAllAsync<{ exercise_id: string }>(
-    `SELECT DISTINCT exercise_id FROM set_entries WHERE session_id = ? ORDER BY completed_at ASC`,
-    [sessionId]
-  );
-  return rows.map((r) => r.exercise_id);
+  const sets = await getSessionSets(sessionId);
+  return [...new Set(sets.map((s) => s.exerciseId))];
 }
 
 export async function currentStreakDays(): Promise<number> {
-  const db = await getDb();
-  const rows = await db.getAllAsync<{ started_at: string }>(
-    `SELECT started_at FROM workout_sessions WHERE status = 'completed' ORDER BY started_at DESC LIMIT 60`
-  );
-  if (rows.length === 0) return 0;
+  const sessions = await listRecentSessions(60);
+  if (sessions.length === 0) return 0;
 
-  const days = new Set(rows.map((r) => new Date(r.started_at).toDateString()));
+  const days = new Set(sessions.map((s) => new Date(s.startedAt).toDateString()));
   let streak = 0;
   const cursor = new Date();
   while (true) {

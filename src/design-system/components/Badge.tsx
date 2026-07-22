@@ -1,22 +1,17 @@
-import { Text, View } from "react-native";
+import { cn } from "@/lib/cn";
 
 type Tone = "progress" | "info" | "ai" | "warn" | "record" | "neutral" | "danger";
 
-const TONE_CLASSES: Record<Tone, { bg: string; text: string }> = {
-  progress: { bg: "bg-progress-bg", text: "text-progress" },
-  info: { bg: "bg-info-bg", text: "text-info" },
-  ai: { bg: "bg-ai-bg", text: "text-ai" },
-  warn: { bg: "bg-warn-bg", text: "text-warn" },
-  record: { bg: "bg-record-bg", text: "text-record" },
-  neutral: { bg: "bg-surface-raised", text: "text-ink-dim" },
-  danger: { bg: "bg-danger-bg", text: "text-danger" },
+const TONE_CLASSES: Record<Tone, string> = {
+  progress: "bg-progress-bg text-progress",
+  info: "bg-info-bg text-info",
+  ai: "bg-ai-bg text-ai",
+  warn: "bg-warn-bg text-warn",
+  record: "bg-record-bg text-record",
+  neutral: "bg-surface-raised text-ink-dim",
+  danger: "bg-danger-bg text-danger",
 };
 
 export function Badge({ label, tone = "neutral" }: { label: string; tone?: Tone }) {
-  const t = TONE_CLASSES[tone];
-  return (
-    <View className={`${t.bg} px-2.5 py-1 rounded-full self-start`}>
-      <Text className={`${t.text} text-xs font-body-semibold`}>{label}</Text>
-    </View>
-  );
+  return <span className={cn("inline-block px-2.5 py-1 rounded-full text-xs font-semibold", TONE_CLASSES[tone])}>{label}</span>;
 }

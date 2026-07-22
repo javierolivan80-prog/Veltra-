@@ -1,11 +1,6 @@
-import { useEffect } from "react";
-import { View, Text as RNText } from "react-native";
-import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from "react-native-svg";
-import Animated, { useAnimatedProps, useSharedValue, withTiming, Easing } from "react-native-reanimated";
-import { colors } from "@/src/design-system/colors";
+"use client";
 
-const AnimatedPath = Animated.createAnimatedComponent(Path);
-const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+import { motion } from "framer-motion";
 
 export interface ChartPoint {
   x: string;
@@ -16,7 +11,6 @@ interface LineChartProps {
   data: ChartPoint[];
   color?: string;
   height?: number;
-  formatValue?: (v: number) => string;
   formatX?: (v: string, index: number) => string;
   predictedY?: number;
 }
@@ -42,29 +36,18 @@ function catmullRomPath(points: { x: number; y: number }[]): string {
   return d;
 }
 
-export function LineChart({ data, color = colors.progress.DEFAULT, height = 220, formatValue, formatX, predictedY }: LineChartProps) {
-  const width = 340; // scaled by parent via viewBox
+export function LineChart({ data, color = "#2CE6A0", height = 220, formatX, predictedY }: LineChartProps) {
+  const width = 340;
   const paddingX = 16;
   const paddingTop = 28;
   const paddingBottom = 28;
-
-  const reveal = useSharedValue(0);
-  useEffect(() => {
-    reveal.value = 0;
-    reveal.value = withTiming(1, { duration: 800, easing: Easing.out(Easing.cubic) });
-  }, [data.length]);
-
-  // Hooks must run unconditionally on every render, so these are declared
-  // before the empty-data early return below even though they're only used
-  // once there's a path to animate.
-  const areaProps = useAnimatedProps(() => ({ opacity: reveal.value }));
-  const lineProps = useAnimatedProps(() => ({ opacity: reveal.value }));
+  const gradientId = `area-${color.replace("#", "")}`;
 
   if (data.length === 0) {
     return (
-      <View style={{ height }} className="items-center justify-center">
-        <RNText className="text-ink-faint text-sm font-body">Todavía no hay datos suficientes</RNText>
-      </View>
+      <div style={{ height }} className="flex items-center justify-center">
+        <p className="text-ink-faint text-sm">Todavía no hay datos suficientes</p>
+      </div>
     );
   }
 
@@ -93,44 +76,63 @@ export function LineChart({ data, color = colors.progress.DEFAULT, height = 220,
   const gridLines = [0.25, 0.5, 0.75].map((f) => paddingTop + chartHeight * f);
 
   return (
-    <View>
-      <Svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
-        <Defs>
-          <LinearGradient id="areaFill" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor={color} stopOpacity={0.32} />
-            <Stop offset="1" stopColor={color} stopOpacity={0} />
-          </LinearGradient>
-        </Defs>
+    <div>
+      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`}>
+        <defs>
+          <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stopColor={color} stopOpacity={0.32} />
+            <stop offset="1" stopColor={color} stopOpacity={0} />
+          </linearGradient>
+        </defs>
 
         {gridLines.map((y, i) => (
-          <Line key={i} x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke={colors.line.subtle} strokeWidth={1} />
+          <line key={i} x1={paddingX} y1={y} x2={width - paddingX} y2={y} stroke="#221F22" strokeWidth={1} />
         ))}
 
-        <AnimatedPath d={areaPath} fill="url(#areaFill)" animatedProps={areaProps} />
-        <AnimatedPath d={linePath} stroke={color} strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" animatedProps={lineProps} />
+        <motion.path
+          d={areaPath}
+          fill={`url(#${gradientId})`}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, delay: 0.3 }}
+        />
+        <motion.path
+          d={linePath}
+          stroke={color}
+          strokeWidth={3}
+          fill="none"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          initial={{ pathLength: 0 }}
+          animate={{ pathLength: 1 }}
+          transition={{ duration: 0.9, ease: "easeOut" }}
+        />
 
         {predictedPoint ? (
-          <Path
-            d={`M ${last.x} ${last.y} L ${predictedPoint.x} ${predictedPoint.y}`}
-            stroke={color}
-            strokeWidth={2}
-            strokeDasharray="5,5"
-            fill="none"
-            opacity={0.55}
-          />
+          <>
+            <line x1={last.x} y1={last.y} x2={predictedPoint.x} y2={predictedPoint.y} stroke={color} strokeWidth={2} strokeDasharray="5,5" opacity={0.55} />
+            <circle cx={predictedPoint.x} cy={predictedPoint.y} r={4} fill="none" stroke={color} strokeWidth={2} opacity={0.7} />
+          </>
         ) : null}
-        {predictedPoint ? <Circle cx={predictedPoint.x} cy={predictedPoint.y} r={4} fill="none" stroke={color} strokeWidth={2} opacity={0.7} /> : null}
 
         {points.map((p, i) =>
-          i === points.length - 1 ? null : <Circle key={i} cx={p.x} cy={p.y} r={2.5} fill={colors.bg.DEFAULT} stroke={color} strokeWidth={1.5} opacity={0.6} />
+          i === points.length - 1 ? null : <circle key={i} cx={p.x} cy={p.y} r={2.5} fill="#0B0B0B" stroke={color} strokeWidth={1.5} opacity={0.6} />
         )}
-        <AnimatedCircle cx={last.x} cy={last.y} r={5} fill={color} />
-      </Svg>
+        <motion.circle
+          cx={last.x}
+          cy={last.y}
+          r={5}
+          fill={color}
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ delay: 0.8, type: "spring", stiffness: 300, damping: 15 }}
+        />
+      </svg>
 
-      <View className="flex-row justify-between px-1 -mt-2">
-        <RNText className="text-ink-faint text-[11px] font-body">{formatX ? formatX(data[0].x, 0) : data[0].x}</RNText>
-        <RNText className="text-ink-faint text-[11px] font-body">{formatX ? formatX(data[data.length - 1].x, data.length - 1) : data[data.length - 1].x}</RNText>
-      </View>
-    </View>
+      <div className="flex justify-between px-1 -mt-2">
+        <span className="text-ink-faint text-[11px]">{formatX ? formatX(data[0].x, 0) : data[0].x}</span>
+        <span className="text-ink-faint text-[11px]">{formatX ? formatX(data[data.length - 1].x, data.length - 1) : data[data.length - 1].x}</span>
+      </div>
+    </div>
   );
 }

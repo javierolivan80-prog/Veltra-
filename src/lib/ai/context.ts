@@ -1,12 +1,11 @@
-import { listPersonalRecords } from "@/src/features/exercises/prs";
-import { getExercise, listExercises } from "@/src/features/exercises/repo";
-import { computeRank, isRankEligible } from "@/src/features/exercises/ranks";
-import { getSetsForExercise, listRecentSessions, getExerciseIdsInSession } from "@/src/features/workouts/repo";
-import { listMemoryFacts } from "@/src/features/coach/repo";
-import { getProfile, listInjuries } from "@/src/features/profile/repo";
-import { getDb } from "@/src/lib/db/client";
-import { weightSeries, weeklyFrequency } from "@/src/features/exercises/stats";
-import type { Exercise } from "@/src/types/models";
+import { listPersonalRecords } from "@/features/exercises/prs";
+import { listExercises } from "@/features/exercises/repo";
+import { isRankEligible } from "@/features/exercises/ranks";
+import { getSetsForExercise, listRecentSessions, getExerciseIdsInSession } from "@/features/workouts/repo";
+import { listMemoryFacts } from "@/features/coach/repo";
+import { getProfile, listInjuries } from "@/features/profile/repo";
+import { weeklyFrequency } from "@/features/exercises/stats";
+import type { Exercise } from "@/types/models";
 
 export interface CoachContext {
   profileSummary: string;
@@ -32,7 +31,7 @@ export async function buildCoachContext(): Promise<CoachContext> {
   ]);
 
   const profileSummary = profile
-    ? `${profile.fullName}, ${profile.sex}, ${profile.bodyweightKg ?? "?"}kg, nivel ${profile.experienceLevel}, objetivo ${profile.goal}.`
+    ? `${profile.fullName}, ${profile.sex}, ${profile.bodyweightKg ?? "?"}kg, nivel ${profile.experienceLevel}, objetivo ${profile.goal}, entrena ${profile.trainingDaysPerWeek} días/semana.`
     : "Perfil aún no configurado.";
 
   const injuriesSummary = injuries.filter((i) => i.active).map((i) => `${i.area}: ${i.note}`).join(" | ") || "Sin lesiones activas registradas.";
@@ -47,23 +46,20 @@ export async function buildCoachContext(): Promise<CoachContext> {
   }
   const recentSessionsSummary = sessionLines.join("\n") || "Sin sesiones registradas todavía.";
 
-  const db = await getDb();
   const rankable = exercises.filter(isRankEligible);
-  const scored: { exercise: Exercise; freq: number; trendUp: boolean }[] = [];
+  const scored: { exercise: Exercise; freq: number }[] = [];
   for (const ex of rankable) {
     const sets = await getSetsForExercise(ex.id);
     if (sets.length === 0) continue;
     const freq = weeklyFrequency(sets, 8);
-    const series = weightSeries(sets);
-    const trendUp = series.length >= 2 && series[series.length - 1].value > series[0].value;
-    scored.push({ exercise: ex, freq, trendUp });
+    scored.push({ exercise: ex, freq });
   }
   const lagging = [...scored].sort((a, b) => a.freq - b.freq).slice(0, 3);
   const laggingMuscleGroups = lagging.map((s) => `${s.exercise.name} (${s.freq}x/semana)`).join(", ") || "Sin suficientes datos.";
 
   const prSummaries: string[] = [];
   for (const ex of rankable.slice(0, 8)) {
-    const prs = await listPersonalRecords(db, ex.id);
+    const prs = await listPersonalRecords(ex.id);
     const oneRm = prs.find((p) => p.type === "1rm");
     if (oneRm) prSummaries.push(`${ex.name}: ${oneRm.value}kg 1RM est.`);
   }
@@ -73,7 +69,8 @@ export async function buildCoachContext(): Promise<CoachContext> {
 }
 
 export async function suggestNextWeight(exerciseId: string): Promise<{ weight: number; reps: number; reasoning: string } | null> {
-  const exercise = await getExercise(exerciseId);
+  const exercises = await listExercises();
+  const exercise = exercises.find((e) => e.id === exerciseId);
   if (!exercise) return null;
   const sets = await getSetsForExercise(exerciseId);
   if (sets.length === 0) return null;
@@ -81,10 +78,11 @@ export async function suggestNextWeight(exerciseId: string): Promise<{ weight: n
   const recentAvgRir = sets.slice(-3).reduce((sum, s) => sum + (s.rir ?? 2), 0) / Math.min(3, sets.length);
 
   if (recentAvgRir >= 3) {
-    return { weight: Math.round((last.weightKg * 1.025) * 4) / 4, reps: last.reps, reasoning: "tus últimas series se quedaron con margen (RIR alto), así que hay hueco para subir carga" };
+    return { weight: Math.round(last.weightKg * 1.025 * 4) / 4, reps: last.reps, reasoning: "tus últimas series se quedaron con margen (RIR alto), así que hay hueco para subir carga" };
   }
   if (recentAvgRir <= 0.5) {
     return { weight: last.weightKg, reps: last.reps, reasoning: "tus últimas series estuvieron al fallo o muy cerca, mantén el peso y consolida técnica" };
   }
   return { weight: last.weightKg, reps: last.reps, reasoning: "tu esfuerzo reciente está en un buen rango, repite el peso y busca una repetición más" };
 }
+

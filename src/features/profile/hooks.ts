@@ -1,3 +1,5 @@
+"use client";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as repo from "./repo";
 import type { ProfileInput } from "./repo";

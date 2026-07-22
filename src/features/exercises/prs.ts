@@ -1,16 +1,19 @@
-import type { SQLiteDatabase } from "expo-sqlite";
-import { generateId } from "@/src/lib/id";
-import type { Exercise, PersonalRecord, RecordType } from "@/src/types/models";
-import { effectiveWeight, estimatedOneRepMax } from "./stats";
+import { getDb } from "@/lib/db/client";
+import { generateId } from "@/lib/id";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { toCamelCase, toSnakeCase } from "@/lib/supabase/case";
+import { requireUserId } from "@/lib/supabase/currentUser";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
+import type { Exercise, PersonalRecord, RecordType } from "@/types/models";
+import { estimatedOneRepMax } from "./stats";
 
 const TYPES: RecordType[] = ["weight", "1rm", "volume", "reps"];
 
-async function currentBest(db: SQLiteDatabase, exerciseId: string, type: RecordType): Promise<number | null> {
-  const row = await db.getFirstAsync<{ value: number }>(
-    `SELECT value FROM personal_records WHERE exercise_id = ? AND type = ? ORDER BY value DESC LIMIT 1`,
-    [exerciseId, type]
-  );
-  return row?.value ?? null;
+async function currentBest(exerciseId: string, type: RecordType): Promise<number | null> {
+  const prs = await listPersonalRecords(exerciseId);
+  const matching = prs.filter((p) => p.type === type);
+  if (matching.length === 0) return null;
+  return Math.max(...matching.map((p) => p.value));
 }
 
 export interface NewSetContext {
@@ -20,12 +23,10 @@ export interface NewSetContext {
   reps: number;
   completedAt: string;
   bodyweightKg: number | null;
-  /** Sum of weight*reps across every set logged for this exercise in the current session so far, including this one. */
   sessionVolumeSoFar: number;
 }
 
-/** Called right after a set is saved. Returns the record types broken (if any) so the UI can celebrate. */
-export async function checkAndRecordPRs(db: SQLiteDatabase, ctx: NewSetContext): Promise<PersonalRecord[]> {
+export async function checkAndRecordPRs(ctx: NewSetContext): Promise<PersonalRecord[]> {
   const broken: PersonalRecord[] = [];
   const candidates: Record<RecordType, number> = {
     weight: ctx.weightKg,
@@ -35,61 +36,73 @@ export async function checkAndRecordPRs(db: SQLiteDatabase, ctx: NewSetContext):
   };
 
   for (const type of TYPES) {
-    const best = await currentBest(db, ctx.exercise.id, type);
+    const best = await currentBest(ctx.exercise.id, type);
     const candidate = candidates[type];
     if (best !== null && candidate <= best) continue;
 
-    const id = generateId();
-    await db.runAsync(
-      `INSERT INTO personal_records (id, exercise_id, type, value, previous_value, achieved_at, set_entry_id) VALUES (?, ?, ?, ?, ?, ?, ?)`,
-      [id, ctx.exercise.id, type, candidate, best, ctx.completedAt, ctx.setId]
-    );
-    broken.push({
-      id,
+    const record: PersonalRecord = {
+      id: generateId(),
       exerciseId: ctx.exercise.id,
       type,
       value: candidate,
       previousValue: best,
       achievedAt: ctx.completedAt,
       setEntryId: ctx.setId,
-    });
+    };
+
+    if (isSupabaseConfigured) {
+      const supabase = getSupabaseBrowserClient()!;
+      const userId = await requireUserId();
+      await supabase.from("personal_records").insert({ ...toSnakeCase(record), user_id: userId });
+    } else {
+      const db = await getDb();
+      await db.put("personalRecords", record);
+    }
+    broken.push(record);
   }
 
   return broken;
 }
 
-export async function listPersonalRecords(db: SQLiteDatabase, exerciseId: string): Promise<PersonalRecord[]> {
-  const rows = await db.getAllAsync<any>(`SELECT * FROM personal_records WHERE exercise_id = ? ORDER BY achieved_at DESC`, [exerciseId]);
-  return rows.map((r) => ({
-    id: r.id,
-    exerciseId: r.exercise_id,
-    type: r.type,
-    value: r.value,
-    previousValue: r.previous_value,
-    achievedAt: r.achieved_at,
-    setEntryId: r.set_entry_id,
-  }));
+export async function listPersonalRecords(exerciseId: string): Promise<PersonalRecord[]> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data, error } = await supabase.from("personal_records").select("*").eq("exercise_id", exerciseId).order("achieved_at", { ascending: false });
+    if (error || !data) return [];
+    return data.map((r: any) => toCamelCase<PersonalRecord>(r));
+  }
+  const db = await getDb();
+  const all = await db.getAllFromIndex("personalRecords", "exerciseId", exerciseId);
+  return all.sort((a, b) => b.achievedAt.localeCompare(a.achievedAt));
 }
 
 export interface RecentPR extends PersonalRecord {
   exerciseName: string;
 }
 
-export async function listRecentPRs(db: SQLiteDatabase, limit = 10): Promise<RecentPR[]> {
-  const rows = await db.getAllAsync<any>(
-    `SELECT pr.*, e.name as exercise_name FROM personal_records pr JOIN exercises e ON e.id = pr.exercise_id ORDER BY pr.achieved_at DESC LIMIT ?`,
-    [limit]
-  );
-  return rows.map((r) => ({
-    id: r.id,
-    exerciseId: r.exercise_id,
-    type: r.type,
-    value: r.value,
-    previousValue: r.previous_value,
-    achievedAt: r.achieved_at,
-    setEntryId: r.set_entry_id,
-    exerciseName: r.exercise_name,
-  }));
-}
+export async function listRecentPRs(limit = 10): Promise<RecentPR[]> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data, error } = await supabase
+      .from("personal_records")
+      .select("*, exercises(name)")
+      .order("achieved_at", { ascending: false })
+      .limit(limit);
+    if (error || !data) return [];
+    return data.map((r: Record<string, unknown>) => {
+      const { exercises, ...rest } = r;
+      const exerciseName = (exercises as { name?: string } | null)?.name ?? "Ejercicio";
+      return { ...toCamelCase<PersonalRecord>(rest), exerciseName };
+    });
+  }
 
-export { effectiveWeight };
+  const db = await getDb();
+  const all = await db.getAll("personalRecords");
+  const sorted = all.sort((a, b) => b.achievedAt.localeCompare(a.achievedAt)).slice(0, limit);
+  const withNames: RecentPR[] = [];
+  for (const pr of sorted) {
+    const exercise = await db.get("exercises", pr.exerciseId);
+    withNames.push({ ...pr, exerciseName: exercise?.name ?? "Ejercicio" });
+  }
+  return withNames;
+}

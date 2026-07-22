@@ -1,7 +1,9 @@
+"use client";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { exerciseKeys } from "@/features/exercises/hooks";
 import * as repo from "./repo";
 import type { AddSetInput } from "./repo";
-import { exerciseKeys } from "@/src/features/exercises/hooks";
 
 export const workoutKeys = {
   all: ["workouts"] as const,
@@ -58,9 +60,7 @@ export function useEndSession() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, status }: { id: string; status?: "completed" | "discarded" }) => repo.endSession(id, status),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: workoutKeys.all });
-    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: workoutKeys.all }),
   });
 }
 

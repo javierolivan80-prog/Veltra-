@@ -1,4 +1,4 @@
-import type { Equipment, Exercise, MuscleGroup, StrengthPattern } from "@/src/types/models";
+import type { Equipment, Exercise, MuscleGroup, StrengthPattern } from "@/types/models";
 
 type SeedExercise = {
   id: string;

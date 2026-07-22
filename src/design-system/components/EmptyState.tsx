@@ -1,5 +1,4 @@
 import type { ReactNode } from "react";
-import { Text, View } from "react-native";
 import { Button } from "./Button";
 
 export function EmptyState({
@@ -16,15 +15,15 @@ export function EmptyState({
   onAction?: () => void;
 }) {
   return (
-    <View className="items-center justify-center py-14 px-6">
-      {icon ? <View className="mb-4">{icon}</View> : null}
-      <Text className="text-ink text-lg font-display text-center">{title}</Text>
-      {description ? <Text className="text-ink-dim text-sm font-body text-center mt-2 leading-5">{description}</Text> : null}
+    <div className="flex flex-col items-center justify-center py-14 px-6 text-center">
+      {icon ? <div className="mb-4">{icon}</div> : null}
+      <p className="text-ink text-lg font-display">{title}</p>
+      {description ? <p className="text-ink-dim text-sm mt-2 leading-5 max-w-sm">{description}</p> : null}
       {actionLabel ? (
-        <View className="mt-5">
-          <Button label={actionLabel} onPress={onAction} variant="secondary" size="sm" />
-        </View>
+        <div className="mt-5">
+          <Button label={actionLabel} onClick={onAction} variant="secondary" size="sm" />
+        </div>
       ) : null}
-    </View>
+    </div>
   );
 }

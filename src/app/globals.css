@@ -1,0 +1,100 @@
+@import "tailwindcss";
+
+/*
+ * Veltra palette — kept in sync by hand with src/design-system/colors.js
+ * (the JS copy is for contexts that need a raw hex string: SVG chart fills,
+ * gradients, icon colors). Tailwind v4 is CSS-first, so this @theme block is
+ * the source that generates the bg-, text- and border- color utilities.
+ */
+@theme {
+  --color-bg-deep: #090909;
+  --color-bg: #0b0b0b;
+  --color-bg-soft: #0d0d0d;
+
+  --color-surface: #151515;
+  --color-surface-raised: #1a1a1a;
+  --color-surface-hover: #202020;
+
+  --color-line-subtle: #221f22;
+  --color-line: #2a2a2e;
+
+  --color-ink: #f5f5f7;
+  --color-ink-dim: #a8a8ae;
+  --color-ink-faint: #6b6b72;
+
+  --color-progress: #2ce6a0;
+  --color-progress-dim: #1a8f63;
+  --color-progress-bg: #0e2a21;
+
+  --color-info: #4da3ff;
+  --color-info-dim: #2e6fc9;
+  --color-info-bg: #0e2036;
+
+  --color-ai: #a374ff;
+  --color-ai-dim: #7a4fe0;
+  --color-ai-bg: #201332;
+
+  --color-warn: #ff9548;
+  --color-warn-dim: #c96e2e;
+  --color-warn-bg: #2e1b0c;
+
+  --color-record: #ffc94d;
+  --color-record-dim: #c99a2e;
+  --color-record-bg: #2e2409;
+
+  --color-danger: #ff5470;
+  --color-danger-bg: #2e0e17;
+
+  --color-rank-bronze: #c67a3e;
+  --color-rank-silver: #c7cdd6;
+  --color-rank-gold: #f5c453;
+  --color-rank-platinum: #7fe3d6;
+  --color-rank-diamond: #8fc7ff;
+  --color-rank-elite: #ff4d8d;
+
+  --font-display: var(--font-space-grotesk);
+  --font-body: var(--font-inter);
+
+  --radius-3xl: 28px;
+}
+
+html,
+body {
+  background-color: var(--color-bg);
+  color: var(--color-ink);
+}
+
+body {
+  font-family: var(--font-body), system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+* {
+  border-color: var(--color-line-subtle);
+}
+
+::selection {
+  background-color: var(--color-progress);
+  color: var(--color-bg-deep);
+}
+
+/* Thin, unobtrusive scrollbars — the app never wants to look like a document. */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-thumb {
+  background-color: var(--color-line);
+  border-radius: 8px;
+}
+::-webkit-scrollbar-track {
+  background-color: transparent;
+}
+
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}

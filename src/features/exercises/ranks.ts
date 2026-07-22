@@ -1,4 +1,4 @@
-import type { Exercise, ExperienceLevel, RankTier, Sex, StrengthPattern } from "@/src/types/models";
+import type { Exercise, ExperienceLevel, RankTier, Sex, StrengthPattern } from "@/types/models";
 
 /**
  * Rank is only meaningful for compound movements that have established

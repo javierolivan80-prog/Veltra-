@@ -1,24 +1,24 @@
 # Veltra
 
-Veltra no es una app para registrar entrenamientos — es una app para disfrutar viendo cómo progresas. El registro es solo la herramienta; la experiencia gira en torno a la motivación, la sensación de progreso y una estética premium, dark-first.
+Veltra no es una app para registrar entrenamientos — es una plataforma premium donde el objetivo es que disfrutes viendo tu progreso y quieras volver cada día. El registro es solo la herramienta; la experiencia gira en torno a la motivación, la sensación de progreso y una estética dark-first de nivel Symmetry / Whoop / Linear.
 
 ## Stack
 
-- **Expo (React Native + TypeScript)**, `expo-router` para navegación basada en archivos.
-- **NativeWind** (Tailwind para React Native) con la paleta de diseño de Veltra en `src/design-system/colors.js`.
-- **SQLite local (`expo-sqlite`)** como fuente de verdad en el dispositivo — la app funciona 100% sin conexión.
-- **Supabase** (Postgres + Auth + Edge Functions) como backend en la nube opcional: autenticación real, sincronización multi-dispositivo y el entrenador IA.
-- **React Query** para cache/estado de servidor, **Zustand** para estado de UI (sesión de entrenamiento activa, temporizador de descanso).
-- **react-native-svg + react-native-reanimated** para las gráficas y animaciones a medida (sin librerías de charts de terceros).
+- **Next.js 16 (App Router) + TypeScript + Tailwind CSS v4**, Framer Motion para animaciones.
+- **Supabase** (Postgres + Auth con Google OAuth + verificación por email + RLS + Edge Functions) como backend en la nube.
+- **IndexedDB** (vía `idb`) como almacén local — modo "explorar con datos de ejemplo" y respaldo sin conexión mientras no haya un proyecto Supabase configurado.
+- **React Query** para estado de servidor/caché, **Zustand** para estado de UI (temporizador de descanso, sesión de auth).
+- **SVG a medida** (sin librerías de gráficas) para todas las visualizaciones de progreso.
+- **Radix UI** (`Dialog`) para los diálogos accesibles (selector de ejercicios, formularios).
 
 ## Cómo se ejecuta hoy en este entorno
 
 Este entorno de desarrollo **no tiene un proyecto Supabase real ni una clave de API de Claude configurados**. Por diseño, eso no bloquea nada:
 
-- Toda la app funciona completamente **offline-first** contra SQLite local. Rutinas, entrenamientos, gráficas, rangos, récords y el chat del entrenador funcionan sin ninguna clave.
-- El sistema de login (`app/(auth)/sign-in.tsx`, `sign-up.tsx`) está completamente implementado contra Supabase Auth. Sin claves configuradas, muestra un aviso claro y permite continuar en "modo local".
-- El entrenador IA intenta llamar a la Edge Function `ai-coach` (Claude) cuando hay conexión a Supabase; si no la hay (como en este entorno), usa un respondedor local determinista (`src/lib/ai/localCoach.ts`) que **solo usa datos reales del dispositivo** — nunca inventa cifras.
-- Puedes explorar la app con datos de ejemplo desde el onboarding ("Explorar con datos de ejemplo"), que genera 10 semanas de historial realista (rutinas, sesiones, PRs, rangos, conversaciones) para ver toda la experiencia sin tener que entrenar semanas de verdad.
+- La app entera funciona contra **IndexedDB local** cuando no hay claves de Supabase. Rutinas, entrenamientos, gráficas, rangos, récords y el chat del entrenador funcionan igualmente.
+- El sistema de autenticación (`/sign-in`, `/sign-up`, Google OAuth, recuperación de contraseña) está completamente implementado contra Supabase Auth. Sin claves, muestra un aviso claro y permite continuar en "modo local".
+- El entrenador IA intenta llamar a la Edge Function `ai-coach` (Claude) cuando hay una sesión de Supabase activa; si no la hay, usa un respondedor local determinista (`src/lib/ai/localCoach.ts`) que **solo cita datos reales del navegador** — nunca inventa cifras.
+- Desde el onboarding puedes elegir "Explorar con datos de ejemplo", que genera 10 semanas de historial realista (rutinas, sesiones, PRs, rangos, conversaciones) para ver la experiencia completa sin tener que entrenar semanas de verdad.
 
 ## Activar el backend real
 
@@ -28,45 +28,62 @@ Este entorno de desarrollo **no tiene un proyecto Supabase real ni una clave de 
    supabase link --project-ref <tu-project-ref>
    supabase db push   # aplica supabase/migrations/0001_init.sql
    ```
-3. Copia `.env.example` a `.env` y rellena:
+3. Activa el proveedor **Google** en Authentication → Providers (necesitas un Client ID/Secret de Google Cloud Console) y añade `https://<tu-proyecto>.supabase.co/auth/v1/callback` como redirect URI autorizado en Google.
+4. Copia `.env.example` a `.env.local` y rellena:
    ```
-   EXPO_PUBLIC_SUPABASE_URL=...
-   EXPO_PUBLIC_SUPABASE_ANON_KEY=...
+   NEXT_PUBLIC_SUPABASE_URL=...
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=...
    ```
-4. Despliega la Edge Function del entrenador IA y configura su clave de Claude:
+5. Despliega la Edge Function del entrenador IA y su clave de Claude:
    ```bash
    supabase functions deploy ai-coach
    supabase secrets set ANTHROPIC_API_KEY=sk-ant-...
    ```
-5. Reinicia `expo start`. El registro y login pasarán a usar Supabase Auth de verdad, la sincronización se activará automáticamente al recuperar conexión, y el chat usará Claude con memoria real.
+6. Reinicia `npm run dev`. El registro, Google, la verificación por email y el chat pasarán a usar la nube real.
 
-## Arquitectura de datos offline-first
+## Desplegar en Render
 
-- `src/lib/db/schema.ts` — esquema SQLite local.
-- `supabase/migrations/0001_init.sql` — mismo esquema en Postgres, con RLS por usuario.
-- `src/lib/sync/queue.ts` + `src/lib/sync/syncEngine.ts` — cada escritura local se encola; al recuperar conexión (`@react-native-community/netinfo`) se hace push de lo pendiente y pull de cambios remotos.
-- Todas las pantallas leen/escriben siempre en SQLite primero (instantáneo, funciona sin red); la nube es un espejo, no una dependencia.
+1. Crea un **Web Service** en Render apuntando a este repositorio.
+2. Build command: `npm install && npm run build` · Start command: `npm run start`.
+3. Añade las variables de entorno `NEXT_PUBLIC_SUPABASE_URL` y `NEXT_PUBLIC_SUPABASE_ANON_KEY` en la configuración del servicio.
+4. En Supabase, añade la URL pública de Render (`https://tu-app.onrender.com/auth/callback`) como redirect URL permitida (Authentication → URL Configuration).
+
+## Arquitectura de datos
+
+Cada función de `src/features/*/repo.ts` habla con **uno de dos backends** según `isSupabaseConfigured`:
+
+- **Supabase** (`src/lib/supabase/`): cliente de navegador (`@supabase/ssr`), cliente de servidor para Route Handlers, y un `proxy.ts` (antes "middleware") que refresca la sesión en cada petición.
+- **IndexedDB local** (`src/lib/db/`): mismo esquema de tablas que `supabase/migrations/0001_init.sql`, un almacén por tabla.
+
+Esto significa que toda pantalla llama a la misma API (`listExercises()`, `addSet()`, `getProfile()`...) sin importar qué backend esté activo — el cambio es invisible para la interfaz.
 
 ## Estructura del proyecto
 
 ```
-app/                     rutas (expo-router)
 src/
-  design-system/         tokens de color, tipografía, componentes base, gráficas
+  app/                    rutas (Next.js App Router)
+    (auth)/                sign-in, sign-up, forgot/reset-password
+    (app)/                 dashboard, rutinas, coach, perfil (con AppShell)
+    onboarding/             intro + configuración de perfil + cuenta
+    workout/[sessionId]/   registro de entrenamiento (pantalla completa)
+    auth/callback/          Route Handler para OAuth y verificación de email
+  design-system/          tokens de color, tipografía, componentes base, gráficas SVG
   features/
-    exercises/            repos, estadísticas, fórmulas de 1RM, sistema de rangos, recomendador IA
-    routines/              CRUD de rutinas
-    workouts/               sesión activa, registro de series, PRs
-    coach/                  conversaciones, mensajes, memoria
-    profile/                perfil, lesiones, peso corporal
+    exercises/             repos, estadísticas, fórmulas de 1RM, sistema de rangos, recomendador IA
+    routines/               CRUD de rutinas
+    workouts/                sesión activa, registro de series, PRs
+    coach/                   conversaciones, mensajes, memoria
+    profile/                 perfil, lesiones, peso corporal
+    auth/, onboarding/       formularios de cuenta y alta
+    shell/                   navegación responsive (sidebar / bottom nav)
   lib/
-    db/                    cliente SQLite, esquema, seed, datos de demo
-    sync/                   cola de sincronización + motor de sync con Supabase
-    ai/                     contexto del entrenador, cliente IA, respondedor local de fallback
-  state/                  Zustand (sesión de entrenamiento, auth, selector de ejercicio)
+    db/                     esquema y cliente IndexedDB, seed, generador de datos de ejemplo
+    supabase/                clientes browser/server, proxy de sesión, mapeo camelCase↔snake_case
+    ai/                      contexto del entrenador, cliente IA, respondedor local de fallback
+  state/                  Zustand (temporizador de descanso, sesión de auth)
   types/models.ts         modelo de dominio compartido
 supabase/
-  migrations/             esquema Postgres + RLS
+  migrations/             esquema Postgres + RLS (perfil ligado 1:1 a auth.users)
   functions/ai-coach/     Edge Function (Deno) que llama a Claude
 ```
 
@@ -78,7 +95,6 @@ supabase/
 
 ```bash
 npm install
-npm run web      # previsualización en navegador
-npm run ios      # requiere macOS/simulador
-npm run android
+npm run dev      # http://localhost:3000
+npm run build    # build de producción
 ```

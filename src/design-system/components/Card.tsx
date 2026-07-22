@@ -1,32 +1,32 @@
-import type { ReactNode } from "react";
-import { Pressable, View, type ViewProps } from "react-native";
+"use client";
 
-interface CardProps extends ViewProps {
+import { motion } from "framer-motion";
+import type { ReactNode } from "react";
+import { cn } from "@/lib/cn";
+
+interface CardProps {
   children: ReactNode;
-  onPress?: () => void;
+  onClick?: () => void;
   raised?: boolean;
   className?: string;
 }
 
-export function Card({ children, onPress, raised, className, ...rest }: CardProps) {
-  const base = `rounded-3xl border border-line-subtle ${raised ? "bg-surface-raised" : "bg-surface"} p-5`;
+export function Card({ children, onClick, raised, className }: CardProps) {
+  const base = cn("rounded-3xl border border-line-subtle p-5", raised ? "bg-surface-raised" : "bg-surface", className);
 
-  if (onPress) {
+  if (onClick) {
     return (
-      <Pressable
-        onPress={onPress}
-        className={`${base} ${className ?? ""}`}
-        style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
-        {...(rest as any)}
+      <motion.button
+        type="button"
+        onClick={onClick}
+        whileTap={{ scale: 0.98 }}
+        whileHover={{ borderColor: "var(--color-line)" }}
+        className={cn(base, "text-left w-full cursor-pointer")}
       >
         {children}
-      </Pressable>
+      </motion.button>
     );
   }
 
-  return (
-    <View className={`${base} ${className ?? ""}`} {...rest}>
-      {children}
-    </View>
-  );
+  return <div className={base}>{children}</div>;
 }

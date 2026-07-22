@@ -1,16 +1,13 @@
-import { LinearGradient } from "expo-linear-gradient";
-import { Text, View } from "react-native";
-import { colors } from "@/src/design-system/colors";
-import { RANK_META } from "@/src/features/exercises/ranks";
-import type { RankTier } from "@/src/types/models";
+import { RANK_META } from "@/features/exercises/ranks";
+import type { RankTier } from "@/types/models";
 
 const GRADIENTS: Record<RankTier, [string, string]> = {
-  bronze: [colors.rank.bronze, "#7A4A22"],
-  silver: [colors.rank.silver, "#7B8390"],
-  gold: [colors.rank.gold, "#9C6E14"],
-  platinum: [colors.rank.platinum, "#2E8F86"],
-  diamond: [colors.rank.diamond, "#3E6FBF"],
-  elite: [colors.rank.elite, "#8A1240"],
+  bronze: ["#C67A3E", "#7A4A22"],
+  silver: ["#C7CDD6", "#7B8390"],
+  gold: ["#F5C453", "#9C6E14"],
+  platinum: ["#7FE3D6", "#2E8F86"],
+  diamond: ["#8FC7FF", "#3E6FBF"],
+  elite: ["#FF4D8D", "#8A1240"],
 };
 
 type Size = "sm" | "md" | "lg";
@@ -23,28 +20,22 @@ const SIZES: Record<Size, { box: number; emoji: number; label: string }> = {
 export function RankBadge({ tier, size = "md", showLabel = true }: { tier: RankTier; size?: Size; showLabel?: boolean }) {
   const meta = RANK_META[tier];
   const dims = SIZES[size];
+  const [from, to] = GRADIENTS[tier];
+
   return (
-    <View className="items-center">
-      <LinearGradient
-        colors={GRADIENTS[tier]}
-        start={{ x: 0.15, y: 0.1 }}
-        end={{ x: 0.9, y: 1 }}
+    <div className="flex flex-col items-center">
+      <div
+        className="flex items-center justify-center rounded-full"
         style={{
           width: dims.box,
           height: dims.box,
-          borderRadius: dims.box / 2,
-          alignItems: "center",
-          justifyContent: "center",
-          shadowColor: GRADIENTS[tier][0],
-          shadowOpacity: 0.55,
-          shadowRadius: dims.box * 0.35,
-          shadowOffset: { width: 0, height: 0 },
-          elevation: 8,
+          background: `linear-gradient(135deg, ${from}, ${to})`,
+          boxShadow: `0 0 ${dims.box * 0.45}px ${from}66`,
         }}
       >
-        <Text style={{ fontSize: dims.emoji }}>{meta.emoji}</Text>
-      </LinearGradient>
-      {showLabel ? <Text className={`${dims.label} font-body-bold text-ink mt-1.5`}>{meta.label}</Text> : null}
-    </View>
+        <span style={{ fontSize: dims.emoji }}>{meta.emoji}</span>
+      </div>
+      {showLabel ? <span className={`font-bold text-ink mt-1.5 ${dims.label}`}>{meta.label}</span> : null}
+    </div>
   );
 }

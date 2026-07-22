@@ -1,61 +1,60 @@
-import * as Haptics from "expo-haptics";
+"use client";
+
+import { motion } from "framer-motion";
 import type { ReactNode } from "react";
-import { ActivityIndicator, Platform, Pressable, Text } from "react-native";
+import { cn } from "@/lib/cn";
 
 type Variant = "primary" | "secondary" | "ghost" | "danger" | "ai";
 type Size = "sm" | "md" | "lg";
 
 interface ButtonProps {
   label: string;
-  onPress?: () => void;
+  onClick?: () => void;
+  type?: "button" | "submit";
   variant?: Variant;
   size?: Size;
   icon?: ReactNode;
   disabled?: boolean;
   loading?: boolean;
   fullWidth?: boolean;
-  haptic?: boolean;
 }
 
-const VARIANT_STYLES: Record<Variant, { container: string; text: string }> = {
-  primary: { container: "bg-progress", text: "text-bg-deep" },
-  secondary: { container: "bg-surface-raised border border-line", text: "text-ink" },
-  ghost: { container: "bg-transparent", text: "text-ink-dim" },
-  danger: { container: "bg-danger", text: "text-white" },
-  ai: { container: "bg-ai", text: "text-white" },
+const VARIANT_STYLES: Record<Variant, string> = {
+  primary: "bg-progress text-bg-deep hover:bg-progress/90",
+  secondary: "bg-surface-raised border border-line text-ink hover:bg-surface-hover",
+  ghost: "bg-transparent text-ink-dim hover:text-ink",
+  danger: "bg-danger text-white hover:bg-danger/90",
+  ai: "bg-ai text-white hover:bg-ai/90",
 };
 
-const SIZE_STYLES: Record<Size, { container: string; text: string }> = {
-  sm: { container: "px-3.5 py-2 rounded-xl", text: "text-sm font-body-semibold" },
-  md: { container: "px-5 py-3.5 rounded-2xl", text: "text-base font-body-semibold" },
-  lg: { container: "px-6 py-4 rounded-2xl", text: "text-lg font-body-bold" },
+const SIZE_STYLES: Record<Size, string> = {
+  sm: "px-3.5 py-2 rounded-xl text-sm font-semibold",
+  md: "px-5 py-3.5 rounded-2xl text-base font-semibold",
+  lg: "px-6 py-4 rounded-2xl text-lg font-bold",
 };
 
-export function Button({ label, onPress, variant = "primary", size = "md", icon, disabled, loading, fullWidth, haptic = true }: ButtonProps) {
-  const v = VARIANT_STYLES[variant];
-  const s = SIZE_STYLES[size];
-
-  const handlePress = () => {
-    if (disabled || loading) return;
-    if (haptic && Platform.OS !== "web") Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    onPress?.();
-  };
-
+export function Button({ label, onClick, type = "button", variant = "primary", size = "md", icon, disabled, loading, fullWidth }: ButtonProps) {
   return (
-    <Pressable
-      onPress={handlePress}
+    <motion.button
+      type={type}
+      onClick={onClick}
       disabled={disabled || loading}
-      className={`${v.container} ${s.container} ${fullWidth ? "w-full" : ""} flex-row items-center justify-center gap-2`}
-      style={({ pressed }) => [{ opacity: pressed ? 0.85 : disabled ? 0.45 : 1 }]}
+      whileTap={{ scale: disabled || loading ? 1 : 0.97 }}
+      className={cn(
+        "font-display flex items-center justify-center gap-2 transition-colors disabled:opacity-45 disabled:cursor-not-allowed",
+        VARIANT_STYLES[variant],
+        SIZE_STYLES[size],
+        fullWidth && "w-full"
+      )}
     >
       {loading ? (
-        <ActivityIndicator color={variant === "primary" ? "#0B0B0B" : "#F5F5F7"} />
+        <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" />
       ) : (
         <>
           {icon}
-          <Text className={`${v.text} ${s.text}`}>{label}</Text>
+          <span>{label}</span>
         </>
       )}
-    </Pressable>
+    </motion.button>
   );
 }

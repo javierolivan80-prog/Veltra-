@@ -1,6 +1,4 @@
-import { Feather } from "@expo/vector-icons";
-import { Pressable, Text, View } from "react-native";
-import { colors } from "@/src/design-system/colors";
+import { Minus, Plus } from "lucide-react";
 
 export function Stepper({
   label,
@@ -20,17 +18,25 @@ export function Stepper({
   format?: (v: number) => string;
 }) {
   return (
-    <View className="items-center">
-      <Text className="text-ink-faint text-[11px] font-body-medium mb-1.5">{label}</Text>
-      <View className="flex-row items-center gap-2.5 bg-surface border border-line-subtle rounded-xl px-1.5 py-1.5">
-        <Pressable onPress={() => onChange(Math.max(min, Math.round((value - step) * 100) / 100))} hitSlop={6} className="w-7 h-7 items-center justify-center">
-          <Feather name="minus" size={14} color={colors.ink.dim} />
-        </Pressable>
-        <Text className="text-ink text-sm font-body-bold w-10 text-center">{format ? format(value) : value}</Text>
-        <Pressable onPress={() => onChange(Math.min(max, Math.round((value + step) * 100) / 100))} hitSlop={6} className="w-7 h-7 items-center justify-center">
-          <Feather name="plus" size={14} color={colors.ink.dim} />
-        </Pressable>
-      </View>
-    </View>
+    <div className="flex flex-col items-center">
+      <span className="text-ink-faint text-[11px] font-medium mb-1.5 tracking-wide">{label}</span>
+      <div className="flex items-center gap-2.5 bg-surface border border-line-subtle rounded-xl px-1.5 py-1.5">
+        <button
+          type="button"
+          onClick={() => onChange(Math.max(min, Math.round((value - step) * 100) / 100))}
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-hover text-ink-dim"
+        >
+          <Minus size={14} />
+        </button>
+        <span className="text-ink text-sm font-bold w-12 text-center tabular-nums">{format ? format(value) : value}</span>
+        <button
+          type="button"
+          onClick={() => onChange(Math.min(max, Math.round((value + step) * 100) / 100))}
+          className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-hover text-ink-dim"
+        >
+          <Plus size={14} />
+        </button>
+      </div>
+    </div>
   );
 }

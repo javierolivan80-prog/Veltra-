@@ -1,8 +1,8 @@
-import { listExercises } from "@/src/features/exercises/repo";
-import { getSetsForExercise } from "@/src/features/workouts/repo";
-import { getProfile, listInjuries } from "@/src/features/profile/repo";
-import { weeklyFrequency } from "@/src/features/exercises/stats";
-import type { Exercise, StrengthPattern } from "@/src/types/models";
+import { listExercises } from "@/features/exercises/repo";
+import { getSetsForExercise } from "@/features/workouts/repo";
+import { getProfile, listInjuries } from "@/features/profile/repo";
+import { weeklyFrequency } from "@/features/exercises/stats";
+import type { Exercise, StrengthPattern } from "@/types/models";
 
 const INJURY_PATTERN_CONFLICTS: Record<string, StrengthPattern[]> = {
   shoulder: ["vertical_press"],

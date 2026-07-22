@@ -1,9 +1,10 @@
+"use client";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { getDb } from "@/src/lib/db/client";
-import * as repo from "./repo";
-import type { ExerciseInput } from "./repo";
 import { listPersonalRecords, listRecentPRs } from "./prs";
 import { recommendExercises } from "./recommend";
+import * as repo from "./repo";
+import type { ExerciseInput } from "./repo";
 
 export const exerciseKeys = {
   all: ["exercises"] as const,
@@ -61,29 +62,26 @@ export function useDuplicateExercise() {
   });
 }
 
-export function usePersonalRecords(exerciseId: string | null) {
-  return useQuery({
-    queryKey: [...exerciseKeys.detail(exerciseId ?? ""), "prs"],
-    queryFn: async () => listPersonalRecords(await getDb(), exerciseId!),
-    enabled: !!exerciseId,
-  });
-}
-
-export function useRecentPRs(limit = 10) {
-  return useQuery({
-    queryKey: [...exerciseKeys.all, "recentPRs", limit],
-    queryFn: async () => listRecentPRs(await getDb(), limit),
-  });
-}
-
-export function useRecommendedExercises(limit = 5) {
-  return useQuery({ queryKey: [...exerciseKeys.all, "recommended", limit], queryFn: () => recommendExercises(limit) });
-}
-
 export function useDeleteExercise() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => repo.deleteExercise(id),
     onSuccess: () => qc.invalidateQueries({ queryKey: exerciseKeys.all }),
   });
+}
+
+export function usePersonalRecords(exerciseId: string | null) {
+  return useQuery({
+    queryKey: [...exerciseKeys.detail(exerciseId ?? ""), "prs"],
+    queryFn: () => listPersonalRecords(exerciseId!),
+    enabled: !!exerciseId,
+  });
+}
+
+export function useRecentPRs(limit = 10) {
+  return useQuery({ queryKey: [...exerciseKeys.all, "recentPRs", limit], queryFn: () => listRecentPRs(limit) });
+}
+
+export function useRecommendedExercises(limit = 5) {
+  return useQuery({ queryKey: [...exerciseKeys.all, "recommended", limit], queryFn: () => recommendExercises(limit) });
 }

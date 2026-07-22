@@ -1,125 +1,172 @@
-import { getDb } from "@/src/lib/db/client";
-import { generateId } from "@/src/lib/id";
-import { enqueueMutation } from "@/src/lib/sync/queue";
-import type { BodyWeightLog, Equipment, ExperienceLevel, Goal, Injury, Profile, Sex } from "@/src/types/models";
+import { getDb } from "@/lib/db/client";
+import { generateId } from "@/lib/id";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { toCamelCase, toSnakeCase } from "@/lib/supabase/case";
+import { requireUserId } from "@/lib/supabase/currentUser";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
+import type { BodyWeightLog, Equipment, ExperienceLevel, Goal, Injury, Profile, Sex } from "@/types/models";
 
 const LOCAL_PROFILE_ID = "local";
 
-function mapProfile(r: any): Profile {
-  return {
-    id: r.id,
-    fullName: r.full_name,
-    email: r.email,
-    sex: r.sex,
-    birthDate: r.birth_date,
-    heightCm: r.height_cm,
-    bodyweightKg: r.bodyweight_kg,
-    experienceLevel: r.experience_level,
-    goal: r.goal,
-    equipmentAvailable: JSON.parse(r.equipment_available ?? "[]"),
-    createdAt: r.created_at,
-    updatedAt: r.updated_at,
-  };
-}
-
-export async function getProfile(): Promise<Profile | null> {
-  const db = await getDb();
-  const row = await db.getFirstAsync<any>(`SELECT * FROM profile LIMIT 1`);
-  return row ? mapProfile(row) : null;
-}
-
 export interface ProfileInput {
   fullName: string;
-  email: string;
   sex: Sex;
   birthDate: string | null;
   heightCm: number | null;
   bodyweightKg: number | null;
   experienceLevel: ExperienceLevel;
   goal: Goal;
+  trainingDaysPerWeek: number;
   equipmentAvailable: Equipment[];
 }
 
-export async function upsertProfile(input: ProfileInput): Promise<Profile> {
-  const db = await getDb();
-  const existing = await getProfile();
-  const now = new Date().toISOString();
-  const id = existing?.id ?? LOCAL_PROFILE_ID;
+export async function getProfile(): Promise<Profile | null> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data: userData } = await supabase.auth.getUser();
+    if (!userData.user) return null;
+    const { data, error } = await supabase.from("profile").select("*").eq("id", userData.user.id).maybeSingle();
+    if (error || !data) return null;
+    return toCamelCase<Profile>(data);
+  }
 
-  await db.runAsync(
-    `INSERT INTO profile (id, full_name, email, sex, birth_date, height_cm, bodyweight_kg, experience_level, goal, equipment_available, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-     ON CONFLICT(id) DO UPDATE SET full_name=excluded.full_name, email=excluded.email, sex=excluded.sex, birth_date=excluded.birth_date,
-       height_cm=excluded.height_cm, bodyweight_kg=excluded.bodyweight_kg, experience_level=excluded.experience_level, goal=excluded.goal,
-       equipment_available=excluded.equipment_available, updated_at=excluded.updated_at`,
-    [
-      id,
-      input.fullName,
-      input.email,
-      input.sex,
-      input.birthDate,
-      input.heightCm,
-      input.bodyweightKg,
-      input.experienceLevel,
-      input.goal,
-      JSON.stringify(input.equipmentAvailable),
-      existing?.createdAt ?? now,
-      now,
-    ]
-  );
-  await enqueueMutation("profile", id, "upsert");
-  return (await getProfile())!;
+  const db = await getDb();
+  return (await db.get("profile", LOCAL_PROFILE_ID)) ?? null;
+}
+
+export async function upsertProfile(input: ProfileInput): Promise<Profile> {
+  const now = new Date().toISOString();
+
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const userId = await requireUserId();
+    const { data: userData } = await supabase.auth.getUser();
+    const payload = toSnakeCase({
+      fullName: input.fullName,
+      sex: input.sex,
+      birthDate: input.birthDate,
+      heightCm: input.heightCm,
+      bodyweightKg: input.bodyweightKg,
+      experienceLevel: input.experienceLevel,
+      goal: input.goal,
+      trainingDaysPerWeek: input.trainingDaysPerWeek,
+      equipmentAvailable: input.equipmentAvailable,
+      onboardingCompleted: true,
+      updatedAt: now,
+    });
+    const { data, error } = await supabase.from("profile").update(payload).eq("id", userId).select().single();
+    if (error) throw error;
+    return toCamelCase<Profile>({ ...data, email: userData.user?.email ?? "" });
+  }
+
+  const db = await getDb();
+  const existing = await db.get("profile", LOCAL_PROFILE_ID);
+  const profile: Profile = {
+    id: LOCAL_PROFILE_ID,
+    fullName: input.fullName,
+    email: existing?.email ?? "demo@veltra.app",
+    sex: input.sex,
+    birthDate: input.birthDate,
+    heightCm: input.heightCm,
+    bodyweightKg: input.bodyweightKg,
+    experienceLevel: input.experienceLevel,
+    goal: input.goal,
+    trainingDaysPerWeek: input.trainingDaysPerWeek,
+    equipmentAvailable: input.equipmentAvailable,
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+  await db.put("profile", profile);
+  return profile;
 }
 
 export async function updateBodyweight(kg: number): Promise<void> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const userId = await requireUserId();
+    await supabase.from("profile").update({ bodyweight_kg: kg, updated_at: new Date().toISOString() }).eq("id", userId);
+    return;
+  }
   const db = await getDb();
-  await db.runAsync(`UPDATE profile SET bodyweight_kg = ?, updated_at = ? WHERE id = ?`, [kg, new Date().toISOString(), LOCAL_PROFILE_ID]);
-  await enqueueMutation("profile", LOCAL_PROFILE_ID, "upsert");
-}
-
-function mapInjury(r: any): Injury {
-  return { id: r.id, area: r.area, note: r.note, active: !!r.active, createdAt: r.created_at };
+  const existing = await db.get("profile", LOCAL_PROFILE_ID);
+  if (existing) await db.put("profile", { ...existing, bodyweightKg: kg, updatedAt: new Date().toISOString() });
 }
 
 export async function listInjuries(): Promise<Injury[]> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data, error } = await supabase.from("injuries").select("*").order("created_at", { ascending: false });
+    if (error || !data) return [];
+    return data.map((r: any) => toCamelCase<Injury>(r));
+  }
   const db = await getDb();
-  const rows = await db.getAllAsync<any>(`SELECT * FROM injuries ORDER BY created_at DESC`);
-  return rows.map(mapInjury);
+  const all = await db.getAll("injuries");
+  return all.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function addInjury(area: string, note: string): Promise<Injury> {
-  const db = await getDb();
   const id = generateId();
   const now = new Date().toISOString();
-  await db.runAsync(`INSERT INTO injuries (id, area, note, active, created_at) VALUES (?, ?, ?, 1, ?)`, [id, area, note, now]);
-  await enqueueMutation("injuries", id, "upsert");
-  return { id, area, note, active: true, createdAt: now };
+  const injury: Injury = { id, area, note, active: true, createdAt: now };
+
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { error } = await supabase.from("injuries").insert(toSnakeCase(injury));
+    if (error) throw error;
+    return injury;
+  }
+  const db = await getDb();
+  await db.put("injuries", injury);
+  return injury;
 }
 
 export async function toggleInjuryActive(id: string): Promise<void> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data } = await supabase.from("injuries").select("active").eq("id", id).single();
+    if (data) await supabase.from("injuries").update({ active: !data.active }).eq("id", id);
+    return;
+  }
   const db = await getDb();
-  await db.runAsync(`UPDATE injuries SET active = NOT active WHERE id = ?`, [id]);
-  await enqueueMutation("injuries", id, "upsert");
+  const existing = await db.get("injuries", id);
+  if (existing) await db.put("injuries", { ...existing, active: !existing.active });
 }
 
 export async function deleteInjury(id: string): Promise<void> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    await supabase.from("injuries").delete().eq("id", id);
+    return;
+  }
   const db = await getDb();
-  await db.runAsync(`DELETE FROM injuries WHERE id = ?`, [id]);
-  await enqueueMutation("injuries", id, "delete");
+  await db.delete("injuries", id);
 }
 
 export async function listBodyWeightLogs(limit = 60): Promise<BodyWeightLog[]> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data, error } = await supabase.from("body_weight_logs").select("*").order("date", { ascending: true }).limit(limit);
+    if (error || !data) return [];
+    return data.map((r: any) => toCamelCase<BodyWeightLog>(r));
+  }
   const db = await getDb();
-  const rows = await db.getAllAsync<any>(`SELECT * FROM body_weight_logs ORDER BY date ASC LIMIT ?`, [limit]);
-  return rows.map((r) => ({ id: r.id, date: r.date, weightKg: r.weight_kg }));
+  const all = await db.getAllFromIndex("bodyWeightLogs", "date");
+  return all.slice(-limit);
 }
 
 export async function addBodyWeightLog(weightKg: number, date?: string): Promise<BodyWeightLog> {
-  const db = await getDb();
   const id = generateId();
   const iso = date ?? new Date().toISOString();
-  await db.runAsync(`INSERT INTO body_weight_logs (id, date, weight_kg) VALUES (?, ?, ?)`, [id, iso, weightKg]);
-  await enqueueMutation("body_weight_logs", id, "upsert");
+  const log: BodyWeightLog = { id, date: iso, weightKg };
+
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { error } = await supabase.from("body_weight_logs").insert(toSnakeCase(log));
+    if (error) throw error;
+  } else {
+    const db = await getDb();
+    await db.put("bodyWeightLogs", log);
+  }
   await updateBodyweight(weightKg);
-  return { id, date: iso, weightKg };
+  return log;
 }

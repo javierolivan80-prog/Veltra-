@@ -1,4 +1,4 @@
-import type { Exercise, SetEntry } from "@/src/types/models";
+import type { Exercise, SetEntry } from "@/types/models";
 
 /** Epley formula — the industry-standard estimated-1RM approximation. */
 export function epley1RM(weight: number, reps: number): number {

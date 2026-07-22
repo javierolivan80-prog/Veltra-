@@ -57,6 +57,7 @@ export interface Profile {
   bodyweightKg: number | null;
   experienceLevel: ExperienceLevel;
   goal: Goal;
+  trainingDaysPerWeek: number;
   equipmentAvailable: Equipment[];
   createdAt: string;
   updatedAt: string;

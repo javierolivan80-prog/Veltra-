@@ -1,32 +1,29 @@
-import { Pressable, Text, View } from "react-native";
-
 export function SectionHeader({
   title,
   subtitle,
   action,
-  onActionPress,
+  onAction,
 }: {
   title: string;
   subtitle?: string;
   action?: string;
-  onActionPress?: () => void;
+  onAction?: () => void;
 }) {
   return (
-    <View className="flex-row items-end justify-between mb-4">
-      <View>
-        <Text className="text-ink text-xl font-display">{title}</Text>
-        {subtitle ? <Text className="text-ink-dim text-sm font-body mt-0.5">{subtitle}</Text> : null}
-      </View>
+    <div className="flex items-end justify-between mb-4">
+      <div>
+        <h2 className="text-ink text-xl font-display">{title}</h2>
+        {subtitle ? <p className="text-ink-dim text-sm mt-0.5">{subtitle}</p> : null}
+      </div>
       {action ? (
-        <Pressable onPress={onActionPress} hitSlop={8}>
-          <Text className="text-progress text-sm font-body-semibold">{action}</Text>
-        </Pressable>
+        <button onClick={onAction} className="text-progress text-sm font-semibold hover:underline">
+          {action}
+        </button>
       ) : null}
-    </View>
+    </div>
   );
 }
 
 export function Divider() {
-  return <View className="h-px bg-line-subtle my-1" />;
+  return <div className="h-px bg-line-subtle my-1" />;
 }
-

@@ -1,36 +1,45 @@
+"use client";
+
 import { useState } from "react";
-import { Text, View } from "react-native";
-import { AuthForm } from "@/src/features/auth/AuthForm";
-import { isSupabaseConfigured } from "@/src/lib/supabase";
-import { Button } from "@/src/design-system/components/Button";
+import { Button } from "@/design-system/components/Button";
+import { AuthForm } from "@/features/auth/AuthForm";
+import { GoogleButton } from "@/features/auth/GoogleButton";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 export function AccountStep({ fullName, onDone }: { fullName: string; onDone: () => void }) {
   const [mode, setMode] = useState<"sign-up" | "sign-in">("sign-up");
 
   return (
-    <View className="flex-1">
-      <View className="mb-6">
-        <Text className="text-ink text-2xl font-display">Guarda tu progreso</Text>
-        <Text className="text-ink-dim text-sm font-body mt-1 leading-5">
+    <div className="flex flex-col gap-6">
+      <div>
+        <h1 className="text-ink text-2xl font-display">Guarda tu progreso</h1>
+        <p className="text-ink-dim text-sm mt-1 leading-5">
           Crea una cuenta para sincronizar entre dispositivos, o continúa en modo local — tus datos ya están seguros en este dispositivo de todas
           formas.
-        </Text>
-      </View>
+        </p>
+      </div>
 
-      <View className="flex-1 justify-center gap-6">
-        <AuthForm mode={mode} fullName={fullName} onSuccess={onDone} />
+      {isSupabaseConfigured ? <GoogleButton next="/onboarding?step=profile" /> : null}
+      {isSupabaseConfigured ? (
+        <div className="flex items-center gap-3">
+          <div className="h-px bg-line-subtle flex-1" />
+          <span className="text-ink-faint text-xs">o con email</span>
+          <div className="h-px bg-line-subtle flex-1" />
+        </div>
+      ) : null}
 
-        {isSupabaseConfigured ? (
-          <Text className="text-center text-ink-dim text-sm font-body">
-            {mode === "sign-up" ? "¿Ya tienes cuenta? " : "¿Primera vez aquí? "}
-            <Text className="text-progress font-body-semibold" onPress={() => setMode(mode === "sign-up" ? "sign-in" : "sign-up")}>
-              {mode === "sign-up" ? "Inicia sesión" : "Crea una cuenta"}
-            </Text>
-          </Text>
-        ) : null}
-      </View>
+      <AuthForm mode={mode} fullName={fullName} onSuccess={onDone} />
 
-      <Button label="Continuar en modo local" variant="ghost" onPress={onDone} fullWidth />
-    </View>
+      {isSupabaseConfigured ? (
+        <p className="text-center text-ink-dim text-sm">
+          {mode === "sign-up" ? "¿Ya tienes cuenta? " : "¿Primera vez aquí? "}
+          <button type="button" className="text-progress font-semibold" onClick={() => setMode(mode === "sign-up" ? "sign-in" : "sign-up")}>
+            {mode === "sign-up" ? "Inicia sesión" : "Crea una cuenta"}
+          </button>
+        </p>
+      ) : null}
+
+      <Button label="Continuar en modo local" variant="ghost" onClick={onDone} fullWidth />
+    </div>
   );
 }

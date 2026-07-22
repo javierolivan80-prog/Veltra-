@@ -1,9 +1,9 @@
-import { listExercises } from "@/src/features/exercises/repo";
-import { getProfile } from "@/src/features/profile/repo";
-import { getSetsForExercise, listRecentSessions } from "@/src/features/workouts/repo";
-import { weightSeries } from "@/src/features/exercises/stats";
+import { listExercises } from "@/features/exercises/repo";
+import { getProfile } from "@/features/profile/repo";
+import { getSetsForExercise, listRecentSessions } from "@/features/workouts/repo";
+import { weightSeries } from "@/features/exercises/stats";
 import { buildCoachContext, suggestNextWeight } from "./context";
-import { formatWeight } from "@/src/lib/format";
+import { formatWeight } from "@/lib/format";
 
 function normalize(text: string): string {
   return text
@@ -21,14 +21,14 @@ async function findExerciseInText(text: string) {
 /**
  * Deterministic, data-grounded responder used when no cloud model is
  * reachable (no Supabase project/API key configured in this environment, or
- * the device is offline). It only ever states numbers pulled from local
- * SQLite — same rule the real edge-function prompt enforces.
+ * the edge function call fails). It only ever states numbers pulled from the
+ * local data layer — same rule the real edge-function prompt enforces.
  */
 export async function generateLocalCoachReply(userText: string): Promise<string> {
   const norm = normalize(userText);
   const ctx = await buildCoachContext();
 
-  if (norm.includes("peso") && (norm.includes("hoy") || norm.includes("deberia") || norm.includes("debería") || norm.includes("usar"))) {
+  if (norm.includes("peso") && (norm.includes("hoy") || norm.includes("deberia") || norm.includes("usar"))) {
     const exercise = await findExerciseInText(userText);
     if (exercise) {
       const suggestion = await suggestNextWeight(exercise.id);
@@ -49,16 +49,16 @@ export async function generateLocalCoachReply(userText: string): Promise<string>
         const recent = series.slice(-4);
         const flat = recent[recent.length - 1].value <= recent[0].value * 1.01;
         if (flat) {
-          return `Mirando tus últimas sesiones de ${exercise.name}, el peso lleva ${recent.length} sesiones prácticamente plano en torno a ${formatWeight(recent[0].value)}kg. Puede ser fatiga acumulada, sueño o que el rango de repeticiones se ha quedado corto. Prueba a bajar un 10% el peso dos sesiones y vuelve a subir progresivamente, o añade una serie extra las próximas dos semanas.`;
+          return `Mirando tus últimas sesiones de ${exercise.name}, el peso lleva ${recent.length} sesiones prácticamente plano en torno a ${formatWeight(recent[0].value)}kg. Puede ser fatiga acumulada, sueño o que el rango de repeticiones se ha quedado corto. Prueba a bajar un 10% el peso dos sesiones y vuelve a subir progresivamente.`;
         }
-        return `En realidad sí estás progresando en ${exercise.name}: has pasado de ${formatWeight(series[0].value)}kg a ${formatWeight(series[series.length - 1].value)}kg en las últimas sesiones registradas. El ritmo puede sentirse lento, pero la tendencia es positiva.`;
+        return `En realidad sí estás progresando en ${exercise.name}: has pasado de ${formatWeight(series[0].value)}kg a ${formatWeight(series[series.length - 1].value)}kg en las últimas sesiones registradas.`;
       }
       return `Todavía no tengo suficientes sesiones de ${exercise.name} registradas para analizar una tendencia real — sigue anotando y en un par de semanas podré decírtelo con datos.`;
     }
     return `¿En qué ejercicio notas el estancamiento? Dime el nombre y reviso tu progresión real.`;
   }
 
-  if (norm.includes("atrasad") || norm.includes("musculo") && norm.includes("mas")) {
+  if (norm.includes("atrasad") || (norm.includes("musculo") && norm.includes("mas"))) {
     return `Según tu frecuencia de entrenamiento reciente, lo que menos estás tocando es: ${ctx.laggingMuscleGroups}. Si tu objetivo lo permite, dale una serie extra la próxima semana.`;
   }
 
@@ -66,20 +66,20 @@ export async function generateLocalCoachReply(userText: string): Promise<string>
     return `Esto es lo que veo en tus sesiones recientes:\n${ctx.recentSessionsSummary}\n\nTus lifts más fuertes ahora mismo: ${ctx.strongestLifts}.`;
   }
 
-  if (norm.includes("record") || norm.includes("récord") || norm.includes("pr ")) {
+  if (norm.includes("record") || norm.includes("pr ")) {
     return `Tus mejores marcas registradas: ${ctx.strongestLifts}. Sigue así y en unas semanas deberíamos ver alguna actualizada.`;
   }
 
   if (norm.includes("mejor mes") || norm.includes("mejor semana")) {
     const sessions = await listRecentSessions(30);
-    return `Has completado ${sessions.length} sesiones registradas recientemente. En cuanto acumules más historial podré comparar meses completos con precisión — de momento tu constancia reciente es sólida.`;
+    return `Has completado ${sessions.length} sesiones registradas recientemente. En cuanto acumules más historial podré comparar meses completos con precisión.`;
   }
 
   if (norm.includes("volumen") && (norm.includes("mucho") || norm.includes("demasiado") || norm.includes("exceso"))) {
-    return `Con la frecuencia y series que estás registrando, tu volumen actual parece razonable para tu nivel (${(await getProfile())?.experienceLevel ?? "intermedio"}). Si notas fatiga persistente o el rendimiento cae sesión tras sesión, seria buena señal para meter una semana de descarga.`;
+    return `Con la frecuencia y series que estás registrando, tu volumen actual parece razonable para tu nivel (${(await getProfile())?.experienceLevel ?? "intermedio"}). Si notas fatiga persistente o el rendimiento cae sesión tras sesión, sería buena señal para meter una semana de descarga.`;
   }
 
-  if (norm.includes("lesion") || norm.includes("lesión") || norm.includes("molestia") || norm.includes("dolor")) {
+  if (norm.includes("lesion") || norm.includes("molestia") || norm.includes("dolor")) {
     return `Gracias por decírmelo, lo tendré en cuenta en tus próximas recomendaciones. ${ctx.injuriesSummary !== "Sin lesiones activas registradas." ? `Ya tengo registrado: ${ctx.injuriesSummary}.` : "Cuéntame en qué zona y evitaré ejercicios que la carguen en exceso."}`;
   }
 

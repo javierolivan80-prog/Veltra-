@@ -1,6 +1,7 @@
-import { addMemoryFact, addMessage, listMemoryFacts, listMessages } from "@/src/features/coach/repo";
-import { isSupabaseConfigured, supabase } from "@/src/lib/supabase";
-import type { CoachMessage } from "@/src/types/models";
+import { addMemoryFact, addMessage, listMemoryFacts, listMessages } from "@/features/coach/repo";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
+import type { CoachMessage } from "@/types/models";
 import { buildCoachContext } from "./context";
 import { generateLocalCoachReply } from "./localCoach";
 
@@ -21,7 +22,7 @@ async function maybeExtractMemory(userText: string) {
  * Calls the deployed `ai-coach` Supabase Edge Function (see
  * supabase/functions/ai-coach) when a project is configured; otherwise (or
  * on any failure) falls back to the deterministic local responder so the
- * chat still works fully offline.
+ * chat still works fully without a live backend.
  */
 export async function sendCoachMessage(conversationId: string, userText: string): Promise<CoachMessage> {
   await addMessage(conversationId, "user", userText);
@@ -29,8 +30,9 @@ export async function sendCoachMessage(conversationId: string, userText: string)
 
   let replyText: string | null = null;
 
-  if (isSupabaseConfigured && supabase) {
+  if (isSupabaseConfigured) {
     try {
+      const supabase = getSupabaseBrowserClient()!;
       const [history, context] = await Promise.all([listMessages(conversationId), buildCoachContext()]);
       const { data, error } = await supabase.functions.invoke("ai-coach", {
         body: { conversationId, message: userText, history: history.slice(-20), context },

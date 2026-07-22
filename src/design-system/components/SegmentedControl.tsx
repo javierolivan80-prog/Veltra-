@@ -1,4 +1,4 @@
-import { Pressable, ScrollView, Text, View } from "react-native";
+import { cn } from "@/lib/cn";
 
 interface Option<T extends string> {
   value: T;
@@ -17,22 +17,26 @@ export function SegmentedControl<T extends string>({
   label?: string;
 }) {
   return (
-    <View>
-      {label ? <Text className="text-ink-dim text-sm font-body-medium mb-2">{label}</Text> : null}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerClassName="gap-2">
+    <div>
+      {label ? <p className="text-ink-dim text-sm font-medium mb-2">{label}</p> : null}
+      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
         {options.map((opt) => {
           const active = opt.value === value;
           return (
-            <Pressable
+            <button
               key={opt.value}
-              onPress={() => onChange(opt.value)}
-              className={`px-4 py-2.5 rounded-full border ${active ? "bg-progress border-progress" : "bg-surface border-line-subtle"}`}
+              type="button"
+              onClick={() => onChange(opt.value)}
+              className={cn(
+                "px-4 py-2.5 rounded-full border text-sm font-semibold whitespace-nowrap transition-colors",
+                active ? "bg-progress border-progress text-bg-deep" : "bg-surface border-line-subtle text-ink-dim hover:text-ink"
+              )}
             >
-              <Text className={`text-sm font-body-semibold ${active ? "text-bg-deep" : "text-ink-dim"}`}>{opt.label}</Text>
-            </Pressable>
+              {opt.label}
+            </button>
           );
         })}
-      </ScrollView>
-    </View>
+      </div>
+    </div>
   );
 }

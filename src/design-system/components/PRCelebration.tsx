@@ -1,7 +1,5 @@
-import { Text, View } from "react-native";
-import { colors } from "@/src/design-system/colors";
-import { formatWeight } from "@/src/lib/format";
-import type { PersonalRecord } from "@/src/types/models";
+import { formatWeight } from "@/lib/format";
+import type { PersonalRecord } from "@/types/models";
 import { CelebrationOverlay } from "./CelebrationOverlay";
 
 const TYPE_LABEL: Record<PersonalRecord["type"], string> = {
@@ -18,38 +16,23 @@ const TYPE_UNIT: Record<PersonalRecord["type"], string> = {
   reps: "reps",
 };
 
-export function PRCelebration({
-  record,
-  exerciseName,
-  onDismiss,
-}: {
-  record: PersonalRecord | null;
-  exerciseName: string;
-  onDismiss: () => void;
-}) {
+export function PRCelebration({ record, exerciseName, onDismiss }: { record: PersonalRecord | null; exerciseName: string; onDismiss: () => void }) {
   return (
     <CelebrationOverlay
-      visible={!!record}
+      open={!!record}
       onDismiss={onDismiss}
-      accentColor={colors.record.DEFAULT}
+      accentColor="#FFC94D"
       eyebrow="Récord personal"
       title={record ? `${formatWeight(record.value)} ${TYPE_UNIT[record.type]}` : ""}
-      subtitle={record ? `${TYPE_LABEL[record.type]} en ${exerciseName}${record.previousValue ? ` · antes ${formatWeight(record.previousValue)} ${TYPE_UNIT[record.type]}` : ""}` : undefined}
+      subtitle={
+        record
+          ? `${TYPE_LABEL[record.type]} en ${exerciseName}${record.previousValue ? ` · antes ${formatWeight(record.previousValue)} ${TYPE_UNIT[record.type]}` : ""}`
+          : undefined
+      }
       icon={
-        <View
-          style={{
-            width: 96,
-            height: 96,
-            borderRadius: 48,
-            backgroundColor: colors.record.bg,
-            alignItems: "center",
-            justifyContent: "center",
-            borderWidth: 2,
-            borderColor: colors.record.DEFAULT,
-          }}
-        >
-          <Text style={{ fontSize: 44 }}>🏆</Text>
-        </View>
+        <div className="w-24 h-24 rounded-full bg-record-bg border-2 border-record flex items-center justify-center">
+          <span className="text-5xl">🏆</span>
+        </div>
       }
     />
   );

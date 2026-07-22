@@ -1,46 +1,55 @@
-import * as SQLite from "expo-sqlite";
-import { CREATE_STATEMENTS, SCHEMA_VERSION } from "./schema";
-import { seedIfEmpty } from "./seed";
+import { openDB, type IDBPDatabase } from "idb";
+import { DB_NAME, DB_VERSION, type VeltraDB } from "./schema";
+import { seedExerciseLibrary } from "./seed";
 
-const DB_NAME = "veltra.db";
+let dbPromise: Promise<IDBPDatabase<VeltraDB>> | null = null;
 
-let dbPromise: Promise<SQLite.SQLiteDatabase> | null = null;
-
-async function migrate(db: SQLite.SQLiteDatabase) {
-  const { user_version } = (await db.getFirstAsync<{ user_version: number }>(
-    "PRAGMA user_version"
-  )) ?? { user_version: 0 };
-
-  if (user_version >= SCHEMA_VERSION) return;
-
-  await db.execAsync("PRAGMA journal_mode = WAL;");
-  await db.withTransactionAsync(async () => {
-    for (const statement of CREATE_STATEMENTS) {
-      await db.execAsync(statement);
-    }
-  });
-  await db.execAsync(`PRAGMA user_version = ${SCHEMA_VERSION};`);
+function assertBrowser() {
+  if (typeof indexedDB === "undefined") {
+    throw new Error("Local DB can only be used in the browser (client components).");
+  }
 }
 
-export function getDb(): Promise<SQLite.SQLiteDatabase> {
+export function getDb(): Promise<IDBPDatabase<VeltraDB>> {
+  assertBrowser();
   if (!dbPromise) {
-    dbPromise = (async () => {
-      const db = await SQLite.openDatabaseAsync(DB_NAME);
-      await migrate(db);
-      await seedIfEmpty(db);
+    dbPromise = openDB<VeltraDB>(DB_NAME, DB_VERSION, {
+      upgrade(db) {
+        db.createObjectStore("profile", { keyPath: "id" });
+        db.createObjectStore("injuries", { keyPath: "id" });
+        db.createObjectStore("bodyWeightLogs", { keyPath: "id" }).createIndex("date", "date");
+        db.createObjectStore("exercises", { keyPath: "id" }).createIndex("name", "name");
+        db.createObjectStore("routines", { keyPath: "id" });
+        db.createObjectStore("routineExercises", { keyPath: "id" }).createIndex("routineId", "routineId");
+        const sessions = db.createObjectStore("workoutSessions", { keyPath: "id" });
+        sessions.createIndex("status", "status");
+        sessions.createIndex("startedAt", "startedAt");
+        const sets = db.createObjectStore("setEntries", { keyPath: "id" });
+        sets.createIndex("sessionId", "sessionId");
+        sets.createIndex("exerciseId", "exerciseId");
+        db.createObjectStore("personalRecords", { keyPath: "id" }).createIndex("exerciseId", "exerciseId");
+        db.createObjectStore("conversations", { keyPath: "id" });
+        db.createObjectStore("coachMessages", { keyPath: "id" }).createIndex("conversationId", "conversationId");
+        db.createObjectStore("memoryFacts", { keyPath: "id" });
+      },
+    }).then(async (db) => {
+      await seedExerciseLibrary(db);
       return db;
-    })();
+    });
   }
   return dbPromise;
 }
 
-/** Test-only / dev escape hatch to fully reset local state. */
-export async function resetDatabase() {
+/** Dev/test escape hatch — wipes all local data and re-seeds the exercise library. */
+export async function resetLocalDb(): Promise<void> {
+  assertBrowser();
   const db = await getDb();
-  await db.execAsync("PRAGMA writable_schema = 1;");
-  await db.execAsync("DELETE FROM sqlite_master WHERE type IN ('table','index','trigger');");
-  await db.execAsync("PRAGMA writable_schema = 0;");
-  await db.execAsync("VACUUM;");
+  db.close();
+  await new Promise<void>((resolve, reject) => {
+    const req = indexedDB.deleteDatabase(DB_NAME);
+    req.onsuccess = () => resolve();
+    req.onerror = () => reject(req.error);
+  });
   dbPromise = null;
   await getDb();
 }

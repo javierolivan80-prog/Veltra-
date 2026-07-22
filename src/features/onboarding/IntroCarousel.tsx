@@ -1,28 +1,26 @@
-import { Feather } from "@expo/vector-icons";
-import { LinearGradient } from "expo-linear-gradient";
-import { useRef, useState } from "react";
-import { Dimensions, NativeScrollEvent, NativeSyntheticEvent, ScrollView, Text, View } from "react-native";
-import { colors } from "@/src/design-system/colors";
-import { Button } from "@/src/design-system/components/Button";
+"use client";
 
-const { width } = Dimensions.get("window");
+import { AnimatePresence, motion } from "framer-motion";
+import { Cpu, TrendingUp, Zap } from "lucide-react";
+import { useState } from "react";
+import { Button } from "@/design-system/components/Button";
 
 const SLIDES = [
   {
-    icon: "trending-up" as const,
-    accent: colors.progress.DEFAULT,
+    icon: TrendingUp,
+    accent: "#2CE6A0",
     title: "Disfruta viendo cómo progresas",
     body: "Veltra no es una app para apuntar entrenamientos. Es la sensación de ver tu progreso, semana tras semana.",
   },
   {
-    icon: "zap" as const,
-    accent: colors.info.DEFAULT,
+    icon: Zap,
+    accent: "#4DA3FF",
     title: "Registra una serie en menos de 3 segundos",
     body: "Abre tu rutina y pulsa el ejercicio actual. Veltra recuerda tu peso, tus repeticiones y tu descanso.",
   },
   {
-    icon: "cpu" as const,
-    accent: colors.ai.DEFAULT,
+    icon: Cpu,
+    accent: "#A374FF",
     title: "Tu entrenador personal con IA",
     body: "Conoce tu historial, tus lesiones y tus objetivos reales — y celebra contigo cada récord y cada subida de rango.",
   },
@@ -30,74 +28,52 @@ const SLIDES = [
 
 export function IntroCarousel({ onFinish }: { onFinish: () => void }) {
   const [page, setPage] = useState(0);
-  const scrollRef = useRef<ScrollView>(null);
-
-  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
-    const p = Math.round(e.nativeEvent.contentOffset.x / width);
-    if (p !== page) setPage(p);
-  };
+  const slide = SLIDES[page];
+  const Icon = slide.icon;
 
   const goNext = () => {
-    if (page < SLIDES.length - 1) {
-      scrollRef.current?.scrollTo({ x: (page + 1) * width, animated: true });
-    } else {
-      onFinish();
-    }
+    if (page < SLIDES.length - 1) setPage((p) => p + 1);
+    else onFinish();
   };
 
   return (
-    <View className="flex-1 bg-bg">
-      <ScrollView
-        ref={scrollRef}
-        horizontal
-        pagingEnabled
-        showsHorizontalScrollIndicator={false}
-        onScroll={handleScroll}
-        scrollEventThrottle={16}
-      >
-        {SLIDES.map((slide, i) => (
-          <View key={i} style={{ width }} className="flex-1 items-center justify-center px-9">
-            <LinearGradient
-              colors={[`${slide.accent}33`, "transparent"]}
-              style={{ width: 180, height: 180, borderRadius: 90, alignItems: "center", justifyContent: "center", marginBottom: 36 }}
+    <div className="min-h-screen flex flex-col bg-bg">
+      <div className="flex-1 flex items-center justify-center px-9 overflow-hidden">
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={page}
+            initial={{ opacity: 0, x: 40 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -40 }}
+            transition={{ duration: 0.35, ease: "easeOut" }}
+            className="flex flex-col items-center text-center max-w-md"
+          >
+            <div
+              className="w-44 h-44 rounded-full flex items-center justify-center mb-9"
+              style={{ background: `radial-gradient(circle, ${slide.accent}33, transparent 70%)` }}
             >
-              <View
-                style={{
-                  width: 96,
-                  height: 96,
-                  borderRadius: 48,
-                  backgroundColor: colors.surface.DEFAULT,
-                  borderWidth: 1,
-                  borderColor: colors.line.DEFAULT,
-                  alignItems: "center",
-                  justifyContent: "center",
-                }}
-              >
-                <Feather name={slide.icon} size={40} color={slide.accent} />
-              </View>
-            </LinearGradient>
-            <Text className="text-ink text-3xl font-display text-center leading-9">{slide.title}</Text>
-            <Text className="text-ink-dim text-base font-body text-center mt-4 leading-6">{slide.body}</Text>
-          </View>
-        ))}
-      </ScrollView>
+              <div className="w-24 h-24 rounded-full bg-surface border border-line flex items-center justify-center">
+                <Icon size={40} color={slide.accent} />
+              </div>
+            </div>
+            <h1 className="text-ink text-3xl font-display leading-9">{slide.title}</h1>
+            <p className="text-ink-dim text-base mt-4 leading-6">{slide.body}</p>
+          </motion.div>
+        </AnimatePresence>
+      </div>
 
-      <View className="px-8 pb-4">
-        <View className="flex-row justify-center gap-2 mb-8">
-          {SLIDES.map((_, i) => (
-            <View
+      <div className="px-8 pb-10 max-w-sm mx-auto w-full">
+        <div className="flex justify-center gap-2 mb-8">
+          {SLIDES.map((s, i) => (
+            <span
               key={i}
-              style={{
-                width: i === page ? 22 : 7,
-                height: 7,
-                borderRadius: 4,
-                backgroundColor: i === page ? SLIDES[page].accent : colors.line.DEFAULT,
-              }}
+              className="h-1.5 rounded-full transition-all"
+              style={{ width: i === page ? 22 : 7, backgroundColor: i === page ? s.accent : "#2A2A2E" }}
             />
           ))}
-        </View>
-        <Button label={page === SLIDES.length - 1 ? "Comenzar" : "Continuar"} onPress={goNext} fullWidth size="lg" />
-      </View>
-    </View>
+        </div>
+        <Button label={page === SLIDES.length - 1 ? "Comenzar" : "Continuar"} onClick={goNext} fullWidth size="lg" />
+      </div>
+    </div>
   );
 }

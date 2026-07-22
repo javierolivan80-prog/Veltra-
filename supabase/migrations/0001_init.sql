@@ -1,10 +1,9 @@
--- Veltra — initial schema.
--- Mirrors the local SQLite schema (src/lib/db/schema.ts) column-for-column
--- so the generic sync engine (src/lib/sync/syncEngine.ts) can push/pull rows
--- without per-table translation. Every table uses a TEXT primary key because
--- ids are generated client-side (expo-crypto randomUUID, or the fixed
--- string "local" for the singleton profile row) and must work identically
--- whether the row started life offline or online.
+-- Veltra — initial schema (Next.js + Supabase web app).
+--
+-- Local "explore with sample data" mode lives entirely in the browser's
+-- IndexedDB (src/lib/db) and never touches this database — so every table
+-- here belongs to a real authenticated user, and `profile.id` can simply
+-- be the Supabase auth user id.
 --
 -- Apply with the Supabase CLI:
 --   supabase link --project-ref <your-project-ref>
@@ -13,13 +12,11 @@
 create extension if not exists "pgcrypto";
 
 -- ---------------------------------------------------------------------
--- profile (one row per account; local device also keeps a single row
--- with id = 'local' until the user signs in and it gets synced)
+-- profile — one row per account, created automatically on sign-up
 -- ---------------------------------------------------------------------
 create table if not exists profile (
-  id text primary key,
-  user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,
-  full_name text not null,
+  id uuid primary key references auth.users(id) on delete cascade,
+  full_name text not null default '',
   email text not null,
   sex text not null default 'other',
   birth_date text,
@@ -27,11 +24,12 @@ create table if not exists profile (
   bodyweight_kg numeric,
   experience_level text not null default 'beginner',
   goal text not null default 'general_fitness',
+  training_days_per_week integer not null default 3,
   equipment_available jsonb not null default '[]',
+  onboarding_completed boolean not null default false,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
-create unique index if not exists profile_user_id_key on profile(user_id);
 
 create table if not exists injuries (
   id text primary key,
@@ -162,14 +160,19 @@ create index if not exists idx_exercises_user on exercises(user_id);
 
 -- ---------------------------------------------------------------------
 -- Row Level Security — every table is scoped to the owning user.
+-- profile uses id = auth.uid() directly instead of a user_id column.
 -- ---------------------------------------------------------------------
+alter table profile enable row level security;
+create policy "select own profile" on profile for select using (id = auth.uid());
+create policy "update own profile" on profile for update using (id = auth.uid()) with check (id = auth.uid());
+
 do $$
 declare
   t text;
 begin
   for t in
     select unnest(array[
-      'profile', 'injuries', 'body_weight_logs', 'exercises', 'routines',
+      'injuries', 'body_weight_logs', 'exercises', 'routines',
       'routine_exercises', 'workout_sessions', 'set_entries', 'personal_records',
       'conversations', 'coach_messages', 'memory_facts'
     ])
@@ -186,8 +189,28 @@ begin
   end loop;
 end $$;
 
--- Note: the profile row is created client-side (src/features/profile/repo.ts
--- upsertProfile, id = "local" on-device) and pushed up by the sync engine on
--- first connection — there's deliberately no auth.users trigger creating it
--- server-side too, since that would race the client upsert against the
--- unique user_id constraint above.
+-- ---------------------------------------------------------------------
+-- Auto-create a profile row the moment a user signs up (works for both
+-- email/password and Google OAuth sign-ups), seeded from whatever the
+-- provider gives us. The onboarding flow then UPDATEs this row.
+-- ---------------------------------------------------------------------
+create or replace function public.handle_new_user()
+returns trigger as $$
+begin
+  insert into public.profile (id, full_name, email, created_at, updated_at)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'full_name', new.raw_user_meta_data->>'name', ''),
+    new.email,
+    now(),
+    now()
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$$ language plpgsql security definer set search_path = public;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute procedure public.handle_new_user();

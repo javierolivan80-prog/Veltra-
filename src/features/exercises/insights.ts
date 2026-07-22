@@ -1,6 +1,6 @@
-import type { Exercise, SetEntry } from "@/src/types/models";
+import type { Exercise, SetEntry } from "@/types/models";
 import { oneRmSeries, weeklyFrequency, weightSeries } from "./stats";
-import { formatWeight } from "@/src/lib/format";
+import { formatWeight } from "@/lib/format";
 
 /** Deterministic, data-grounded blurb — the same rule the AI coach follows: no numbers that aren't actually in the local history. */
 export function explainExerciseProgress(exercise: Exercise, sets: SetEntry[]): string {

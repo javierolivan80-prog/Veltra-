@@ -1,5 +1,7 @@
+"use client";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { sendCoachMessage } from "@/src/lib/ai/coachClient";
+import { sendCoachMessage } from "@/lib/ai/coachClient";
 import * as repo from "./repo";
 
 export const coachKeys = {

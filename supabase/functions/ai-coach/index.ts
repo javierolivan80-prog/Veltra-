@@ -133,7 +133,10 @@ Deno.serve(async (req) => {
     }
 
     const anthropicData = await anthropicRes.json();
-    const rawText: string = anthropicData.content?.[0]?.text ?? "";
+    // Don't assume the text block is content[0] — some models prepend a
+    // "thinking" block, which would silently make the reply come out empty.
+    const textBlock = (anthropicData.content ?? []).find((block: { type: string; text?: string }) => block.type === "text");
+    const rawText: string = textBlock?.text ?? "";
     const { reply, memoryFacts } = extractMemoryUpdates(rawText);
 
     return new Response(JSON.stringify({ reply, memoryFacts }), {

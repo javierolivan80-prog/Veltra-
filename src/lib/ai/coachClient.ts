@@ -7,6 +7,27 @@ import { generateLocalCoachReply } from "./localCoach";
 
 const INJURY_KEYWORDS = ["molestia", "molestias", "dolor", "lesion", "lesión", "lesionad"];
 
+// TEMP DIAGNOSTIC — remove once the edge function is confirmed working.
+async function describeInvokeError(err: unknown): Promise<string> {
+  const context = (err as { context?: unknown })?.context;
+  if (context instanceof Response) {
+    try {
+      const body = await context.clone().json();
+      if (body?.error) return `${String(body.error)} (HTTP ${context.status})`;
+    } catch {
+      // not JSON — fall through
+    }
+    try {
+      const text = await context.text();
+      if (text) return `${text} (HTTP ${context.status})`;
+    } catch {
+      // ignore
+    }
+    return `HTTP ${context.status}`;
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
 async function maybeExtractMemory(userText: string) {
   const norm = userText.toLowerCase();
   if (!INJURY_KEYWORDS.some((k) => norm.includes(k))) return;
@@ -29,6 +50,7 @@ export async function sendCoachMessage(conversationId: string, userText: string)
   await maybeExtractMemory(userText);
 
   let replyText: string | null = null;
+  let debugError: string | null = null;
 
   if (isSupabaseConfigured) {
     try {
@@ -42,13 +64,19 @@ export async function sendCoachMessage(conversationId: string, userText: string)
       for (const fact of data?.memoryFacts ?? []) {
         await addMemoryFact(fact.content, fact.category);
       }
-    } catch {
+    } catch (err) {
       replyText = null;
+      // TEMP DIAGNOSTIC — remove once the edge function is confirmed working.
+      // Surfaces the real failure reason instead of silently falling back.
+      debugError = await describeInvokeError(err);
     }
   }
 
   if (!replyText) {
     replyText = await generateLocalCoachReply(userText);
+    if (debugError) {
+      replyText = `⚠️ [debug ai-coach] ${debugError}\n\n${replyText}`;
+    }
   }
 
   return addMessage(conversationId, "assistant", replyText);

@@ -36,11 +36,13 @@ export function ProfileSetupForm({
   submitting,
   initial,
   submitLabel = "Continuar",
+  error,
 }: {
   onSubmit: (values: ProfileFormValues) => void;
   submitting?: boolean;
   initial?: Partial<ProfileFormValues>;
   submitLabel?: string;
+  error?: string | null;
 }) {
   const [values, setValues] = useState<ProfileFormValues>({
     fullName: "",
@@ -149,6 +151,7 @@ export function ProfileSetupForm({
         </div>
       </div>
 
+      {error ? <p className="text-danger text-sm font-medium">{error}</p> : null}
       <Button label={submitLabel} onClick={() => onSubmit(values)} disabled={!canSubmit} loading={submitting} fullWidth size="lg" />
     </div>
   );

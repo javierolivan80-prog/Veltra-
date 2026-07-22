@@ -164,6 +164,7 @@ create index if not exists idx_exercises_user on exercises(user_id);
 -- ---------------------------------------------------------------------
 alter table profile enable row level security;
 create policy "select own profile" on profile for select using (id = auth.uid());
+create policy "insert own profile" on profile for insert with check (id = auth.uid());
 create policy "update own profile" on profile for update using (id = auth.uid()) with check (id = auth.uid());
 
 do $$

@@ -29,31 +29,42 @@ function OnboardingContent() {
   const [step, setStep] = useState<Step>(skipToProfile ? "profile" : "intro");
   const [loadingDemo, setLoadingDemo] = useState(false);
   const [submitting, setSubmitting] = useState(false);
+  const [profileError, setProfileError] = useState<string | null>(null);
 
   const loadDemo = async () => {
     setLoadingDemo(true);
-    const db = await getDb();
-    await seedDemoData(db);
-    router.replace("/dashboard");
+    try {
+      const db = await getDb();
+      await seedDemoData(db);
+      router.replace("/dashboard");
+    } finally {
+      setLoadingDemo(false);
+    }
   };
 
   const finalizeProfile = async (values: ProfileFormValues) => {
     setSubmitting(true);
-    await upsertProfile({
-      fullName: values.fullName,
-      sex: values.sex,
-      birthDate: ageToBirthDate(values.age),
-      heightCm: values.heightCm ? Number(values.heightCm) : null,
-      bodyweightKg: values.bodyweightKg ? Number(values.bodyweightKg) : null,
-      experienceLevel: values.experienceLevel,
-      goal: values.goal,
-      trainingDaysPerWeek: values.trainingDaysPerWeek,
-      equipmentAvailable: values.equipmentAvailable,
-    });
-    if (values.injuryArea.trim()) {
-      await addInjury(values.injuryArea.trim(), values.injuryNote.trim());
+    setProfileError(null);
+    try {
+      await upsertProfile({
+        fullName: values.fullName,
+        sex: values.sex,
+        birthDate: ageToBirthDate(values.age),
+        heightCm: values.heightCm ? Number(values.heightCm) : null,
+        bodyweightKg: values.bodyweightKg ? Number(values.bodyweightKg) : null,
+        experienceLevel: values.experienceLevel,
+        goal: values.goal,
+        trainingDaysPerWeek: values.trainingDaysPerWeek,
+        equipmentAvailable: values.equipmentAvailable,
+      });
+      if (values.injuryArea.trim()) {
+        await addInjury(values.injuryArea.trim(), values.injuryNote.trim());
+      }
+      router.replace("/dashboard");
+    } catch (err) {
+      setProfileError(err instanceof Error ? err.message : "No se pudo guardar tu perfil. Inténtalo de nuevo.");
+      setSubmitting(false);
     }
-    router.replace("/dashboard");
   };
 
   if (step === "intro") {
@@ -103,7 +114,7 @@ function OnboardingContent() {
   return (
     <div className="min-h-screen flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-lg">
-        <ProfileSetupForm onSubmit={finalizeProfile} submitting={submitting} />
+        <ProfileSetupForm onSubmit={finalizeProfile} submitting={submitting} error={profileError} />
       </div>
     </div>
   );

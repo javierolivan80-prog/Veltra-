@@ -42,6 +42,8 @@ export async function upsertProfile(input: ProfileInput): Promise<Profile> {
     const userId = await requireUserId();
     const { data: userData } = await supabase.auth.getUser();
     const payload = toSnakeCase({
+      id: userId,
+      email: userData.user?.email ?? "",
       fullName: input.fullName,
       sex: input.sex,
       birthDate: input.birthDate,
@@ -54,9 +56,12 @@ export async function upsertProfile(input: ProfileInput): Promise<Profile> {
       onboardingCompleted: true,
       updatedAt: now,
     });
-    const { data, error } = await supabase.from("profile").update(payload).eq("id", userId).select().single();
+    // Normally the profile row already exists (created by the handle_new_user
+    // trigger on sign-up) and this just updates it. upsert() also covers the
+    // case where that row is missing for any reason, instead of failing outright.
+    const { data, error } = await supabase.from("profile").upsert(payload).select().single();
     if (error) throw error;
-    return toCamelCase<Profile>({ ...data, email: userData.user?.email ?? "" });
+    return toCamelCase<Profile>(data);
   }
 
   const db = await getDb();

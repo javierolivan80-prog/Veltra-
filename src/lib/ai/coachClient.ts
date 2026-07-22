@@ -64,7 +64,13 @@ export async function sendCoachMessage(conversationId: string, userText: string)
         body: { conversationId, message: userText, history: history.slice(-20), context },
       });
       if (error) throw error;
-      if (data?.reply) replyText = data.reply as string;
+      if (data?.reply) {
+        replyText = data.reply as string;
+      } else {
+        // TEMP DIAGNOSTIC — the function responded without throwing, but
+        // the body had no usable `reply`. Show exactly what came back.
+        debugError = `Respuesta sin "reply": ${JSON.stringify(data)}`;
+      }
       for (const fact of data?.memoryFacts ?? []) {
         await addMemoryFact(fact.content, fact.category);
       }

@@ -59,7 +59,7 @@ export function ExercisePickerDialog({
               <Cpu size={13} className="text-ai" />
               <span className="text-ai text-xs font-bold uppercase tracking-wider">Recomendado por tu IA</span>
             </div>
-            <div className="flex gap-2.5 overflow-x-auto no-scrollbar pb-1">
+            <div className="flex gap-2.5 overflow-x-auto no-scrollbar scroll-fade-x pb-1 pr-2">
               {recommended.map((rec) => (
                 <button
                   key={rec.exercise.id}

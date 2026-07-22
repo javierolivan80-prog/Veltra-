@@ -157,7 +157,7 @@ export default function ActiveWorkoutPage() {
 
         <RestTimer />
 
-        <div className="flex gap-2 overflow-x-auto no-scrollbar pb-5">
+        <div className="flex gap-2 overflow-x-auto no-scrollbar scroll-fade-x pb-5 pr-2">
           {exerciseList.map((ex, i) => {
             const count = sessionSets.filter((s) => s.exerciseId === ex.exerciseId).length;
             const done = count >= ex.targetSets;

@@ -116,7 +116,7 @@ export default function DashboardPage() {
             <EmptyState title="Todavía no hay récords" description="Registra tu primera serie y Veltra empezará a rastrear tus PRs automáticamente." />
           </Card>
         ) : (
-          <div className="flex gap-3 overflow-x-auto no-scrollbar pb-1">
+          <div className="flex gap-3 overflow-x-auto no-scrollbar scroll-fade-x pb-1 pr-2">
             {recentPRs.map((pr) => (
               <Card key={pr.id} raised className="w-44 shrink-0">
                 <span className="text-2xl">🏆</span>

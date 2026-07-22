@@ -19,7 +19,7 @@ export function SegmentedControl<T extends string>({
   return (
     <div>
       {label ? <p className="text-ink-dim text-sm font-medium mb-2">{label}</p> : null}
-      <div className="flex gap-2 overflow-x-auto no-scrollbar pb-1">
+      <div className="flex gap-2 overflow-x-auto no-scrollbar scroll-fade-x pb-1 pr-2">
         {options.map((opt) => {
           const active = opt.value === value;
           return (

@@ -1,9 +1,11 @@
+import { SEED_EXERCISES, toExercise } from "@/data/seedExercises";
 import { getDb } from "@/lib/db/client";
 import { generateId } from "@/lib/id";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { toCamelCase, toSnakeCase } from "@/lib/supabase/case";
 import { requireUserId } from "@/lib/supabase/currentUser";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { timeoutAfter } from "@/lib/withTimeout";
 import type { Equipment, Exercise, MuscleGroup, StrengthPattern } from "@/types/models";
 
 export interface ExerciseInput {
@@ -15,12 +17,32 @@ export interface ExerciseInput {
   videoUrl?: string | null;
 }
 
+// exercises.id is a global primary key (not scoped per user), so each account
+// needs its own freshly-generated ids when copying the default library in —
+// reusing SEED_EXERCISES' fixed ids would collide across different accounts.
+async function seedDefaultExerciseLibrary(userId: string): Promise<void> {
+  const supabase = getSupabaseBrowserClient()!;
+  const now = new Date().toISOString();
+  const rows = SEED_EXERCISES.map((seed) => ({
+    ...toSnakeCase(toExercise({ ...seed, id: generateId() }, now)),
+    user_id: userId,
+  }));
+  await Promise.race([supabase.from("exercises").insert(rows), timeoutAfter(15000, "Preparando tu catálogo de ejercicios está tardando demasiado.")]);
+}
+
 export async function listExercises(): Promise<Exercise[]> {
   if (isSupabaseConfigured) {
     const supabase = getSupabaseBrowserClient()!;
     const { data, error } = await supabase.from("exercises").select("*").order("name", { ascending: true });
-    if (error || !data) return [];
-    return data.map((r: any) => toCamelCase<Exercise>(r));
+    if (error) return [];
+    if (data && data.length > 0) return data.map((r: any) => toCamelCase<Exercise>(r));
+
+    // Brand-new account (or every exercise was deleted) — the library must
+    // never be empty, same guarantee local/demo mode gives for free.
+    const userId = await requireUserId();
+    await seedDefaultExerciseLibrary(userId);
+    const { data: seeded } = await supabase.from("exercises").select("*").order("name", { ascending: true });
+    return (seeded ?? []).map((r: any) => toCamelCase<Exercise>(r));
   }
   const db = await getDb();
   const all = await db.getAllFromIndex("exercises", "name");

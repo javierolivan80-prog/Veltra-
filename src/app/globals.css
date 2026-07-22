@@ -98,3 +98,11 @@ body {
 .no-scrollbar::-webkit-scrollbar {
   display: none;
 }
+
+/* Fades the edges of a horizontally-scrollable row so content that continues
+   off-screen reads as "swipe for more" instead of getting silently clipped —
+   needed because .no-scrollbar removes the OS's own scroll indicator. */
+.scroll-fade-x {
+  mask-image: linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent);
+  -webkit-mask-image: linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent);
+}

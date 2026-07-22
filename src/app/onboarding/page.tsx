@@ -114,7 +114,7 @@ function OnboardingContent() {
   return (
     <div className="min-h-screen flex items-center justify-center px-6 py-12">
       <div className="w-full max-w-lg">
-        <ProfileSetupForm onSubmit={finalizeProfile} submitting={submitting} error={profileError} />
+        <ProfileSetupForm onSubmit={finalizeProfile} submitting={submitting} error={profileError} compact />
       </div>
     </div>
   );

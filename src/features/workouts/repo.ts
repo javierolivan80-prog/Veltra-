@@ -51,6 +51,22 @@ export async function endSession(id: string, status: "completed" | "discarded" =
   if (existing) await db.put("workoutSessions", { ...existing, status, endedAt: now });
 }
 
+/** Hard-deletes a session and everything logged in it — for "I started this by accident", not for a finished workout (use endSession for that). */
+export async function deleteSession(id: string): Promise<void> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    // set_entries.session_id has `on delete cascade`, so this also removes its sets.
+    await supabase.from("workout_sessions").delete().eq("id", id);
+    return;
+  }
+  const db = await getDb();
+  const sets = await db.getAllFromIndex("setEntries", "sessionId", id);
+  const tx = db.transaction(["setEntries", "workoutSessions"], "readwrite");
+  for (const set of sets) await tx.objectStore("setEntries").delete(set.id);
+  await tx.objectStore("workoutSessions").delete(id);
+  await tx.done;
+}
+
 export async function getSession(id: string): Promise<WorkoutSession | null> {
   if (isSupabaseConfigured) {
     const supabase = getSupabaseBrowserClient()!;

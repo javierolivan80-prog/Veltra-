@@ -12,7 +12,7 @@ import { useExercises } from "@/features/exercises/hooks";
 import { computeRank, isRankEligible } from "@/features/exercises/ranks";
 import { useProfile } from "@/features/profile/hooks";
 import { useRoutine } from "@/features/routines/hooks";
-import { useAddSet, useEndSession, useLastSetForExercise, useSession, useSessionSets } from "@/features/workouts/hooks";
+import { useAddSet, useDeleteSession, useEndSession, useLastSetForExercise, useSession, useSessionSets } from "@/features/workouts/hooks";
 import { cn } from "@/lib/cn";
 import { formatDuration, formatWeight } from "@/lib/format";
 import { useWorkoutSessionStore } from "@/state/workoutSession.store";
@@ -50,6 +50,7 @@ export default function ActiveWorkoutPage() {
   const { data: profile } = useProfile();
   const addSet = useAddSet();
   const endSession = useEndSession();
+  const deleteSession = useDeleteSession();
   const startRest = useWorkoutSessionStore((s) => s.startRest);
 
   const [extra, setExtra] = useState<WorkoutExercise[]>([]);
@@ -142,6 +143,12 @@ export default function ActiveWorkoutPage() {
     router.replace("/dashboard");
   };
 
+  const cancel = async () => {
+    if (!confirm("¿Cancelar este entrenamiento? Se borrará todo lo registrado en esta sesión y no contará en tu historial ni estadísticas.")) return;
+    await deleteSession.mutateAsync(sessionId);
+    router.replace("/dashboard");
+  };
+
   return (
     <div className="min-h-screen bg-bg">
       <div className="max-w-lg mx-auto px-5 pt-6 pb-16">
@@ -150,9 +157,14 @@ export default function ActiveWorkoutPage() {
             <p className="text-ink-dim text-xs font-medium">{session.routineName ?? "Sesión libre"}</p>
             <p className="text-ink text-xl font-display mt-0.5">{elapsed}</p>
           </div>
-          <button onClick={finish} className="px-4 py-2.5 rounded-full bg-surface-raised border border-line-subtle text-ink-dim text-sm font-semibold">
-            Finalizar
-          </button>
+          <div className="flex items-center gap-2">
+            <button onClick={cancel} className="px-3.5 py-2.5 text-danger/80 text-sm font-semibold">
+              Cancelar
+            </button>
+            <button onClick={finish} className="px-4 py-2.5 rounded-full bg-surface-raised border border-line-subtle text-ink-dim text-sm font-semibold">
+              Finalizar
+            </button>
+          </div>
         </div>
 
         <RestTimer />

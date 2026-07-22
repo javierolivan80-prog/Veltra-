@@ -64,6 +64,17 @@ export function useEndSession() {
   });
 }
 
+export function useDeleteSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => repo.deleteSession(id),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: workoutKeys.all });
+      qc.invalidateQueries({ queryKey: exerciseKeys.all });
+    },
+  });
+}
+
 export function useAddSet() {
   const qc = useQueryClient();
   return useMutation({

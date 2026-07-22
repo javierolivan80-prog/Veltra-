@@ -7,6 +7,10 @@ import { generateLocalCoachReply } from "./localCoach";
 
 const INJURY_KEYWORDS = ["molestia", "molestias", "dolor", "lesion", "lesión", "lesionad"];
 
+// Deployed via the Supabase dashboard editor, which auto-assigned this slug
+// instead of "ai-coach" — the name is arbitrary, only the deployed code matters.
+const AI_COACH_FUNCTION_NAME = "bright-function";
+
 // TEMP DIAGNOSTIC — remove once the edge function is confirmed working.
 async function describeInvokeError(err: unknown): Promise<string> {
   const context = (err as { context?: unknown })?.context;
@@ -56,7 +60,7 @@ export async function sendCoachMessage(conversationId: string, userText: string)
     try {
       const supabase = getSupabaseBrowserClient()!;
       const [history, context] = await Promise.all([listMessages(conversationId), buildCoachContext()]);
-      const { data, error } = await supabase.functions.invoke("ai-coach", {
+      const { data, error } = await supabase.functions.invoke(AI_COACH_FUNCTION_NAME, {
         body: { conversationId, message: userText, history: history.slice(-20), context },
       });
       if (error) throw error;

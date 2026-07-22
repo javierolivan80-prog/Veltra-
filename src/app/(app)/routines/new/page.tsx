@@ -59,7 +59,7 @@ export default function NewRoutinePage() {
               <p className="text-ink text-base font-semibold pr-2">
                 {index + 1}. {item.name}
               </p>
-              <button onClick={() => removeDraft(item.key)}>
+              <button onClick={() => removeDraft(item.key)} className="w-9 h-9 flex items-center justify-center -mr-1.5 shrink-0">
                 <Trash2 size={16} className="text-danger" />
               </button>
             </div>

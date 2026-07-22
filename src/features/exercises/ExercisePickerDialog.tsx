@@ -84,7 +84,7 @@ export function ExercisePickerDialog({
                   <p className="text-ink text-base font-semibold truncate">{item.name}</p>
                   <p className="text-ink-faint text-xs mt-0.5 truncate">{item.muscleGroups.map((m) => MUSCLE_LABEL[m] ?? m).join(" · ")}</p>
                 </button>
-                <button onClick={() => toggleFavorite.mutate(item.id)} className="p-2 shrink-0">
+                <button onClick={() => toggleFavorite.mutate(item.id)} className="w-11 h-11 flex items-center justify-center -mr-2 shrink-0">
                   <Star size={18} className={item.isFavorite ? "text-record fill-record" : "text-line"} />
                 </button>
               </div>

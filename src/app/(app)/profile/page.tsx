@@ -128,10 +128,10 @@ export default function ProfilePage() {
                   <p className={`text-sm font-semibold truncate ${injury.active ? "text-ink" : "text-ink-faint line-through"}`}>{injury.area}</p>
                   <p className="text-ink-faint text-xs mt-0.5 truncate">{injury.note}</p>
                 </div>
-                <button onClick={() => toggleInjury.mutate(injury.id)} className="text-info text-xs font-semibold shrink-0">
+                <button onClick={() => toggleInjury.mutate(injury.id)} className="text-info text-xs font-semibold shrink-0 px-2.5 py-2.5 -my-2.5">
                   {injury.active ? "Activa" : "Resuelta"}
                 </button>
-                <button onClick={() => deleteInjury.mutate(injury.id)} className="shrink-0">
+                <button onClick={() => deleteInjury.mutate(injury.id)} className="w-9 h-9 flex items-center justify-center -mr-1.5 shrink-0">
                   <Trash2 size={14} className="text-danger" />
                 </button>
               </div>

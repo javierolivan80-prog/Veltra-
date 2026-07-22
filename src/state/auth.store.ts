@@ -3,6 +3,10 @@
 import type { AuthChangeEvent, Session, User } from "@supabase/supabase-js";
 import { create } from "zustand";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
+import { timeoutAfter } from "@/lib/withTimeout";
+
+const AUTH_TIMEOUT_MS = 15000;
+const AUTH_TIMEOUT_MESSAGE = "La conexión está tardando demasiado. Revisa tu conexión e inténtalo de nuevo.";
 
 interface AuthState {
   initialized: boolean;
@@ -44,24 +48,42 @@ export const useAuthStore = create<AuthState>((set, get) => ({
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return { ok: false, error: "Supabase no está configurado en este entorno todavía." };
     set({ loading: true, error: null });
-    const { data, error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: { data: { full_name: fullName }, emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined },
-    });
-    set({ loading: false, error: error?.message ?? null, session: data.session, user: data.user });
-    if (error) return { ok: false, error: error.message };
-    // Supabase returns a user with no session when email confirmation is required.
-    return { ok: true, needsEmailConfirmation: !data.session };
+    try {
+      const { data, error } = await Promise.race([
+        supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { full_name: fullName }, emailRedirectTo: typeof window !== "undefined" ? `${window.location.origin}/auth/callback` : undefined },
+        }),
+        timeoutAfter(AUTH_TIMEOUT_MS, AUTH_TIMEOUT_MESSAGE),
+      ]);
+      set({ loading: false, error: error?.message ?? null, session: data.session, user: data.user });
+      if (error) return { ok: false, error: error.message };
+      // Supabase returns a user with no session when email confirmation is required.
+      return { ok: true, needsEmailConfirmation: !data.session };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : AUTH_TIMEOUT_MESSAGE;
+      set({ loading: false, error: message });
+      return { ok: false, error: message };
+    }
   },
 
   signIn: async (email, password) => {
     const supabase = getSupabaseBrowserClient();
     if (!supabase) return { ok: false, error: "Supabase no está configurado en este entorno todavía." };
     set({ loading: true, error: null });
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-    set({ loading: false, error: error?.message ?? null, session: data.session, user: data.user });
-    return error ? { ok: false, error: error.message } : { ok: true };
+    try {
+      const { data, error } = await Promise.race([
+        supabase.auth.signInWithPassword({ email, password }),
+        timeoutAfter(AUTH_TIMEOUT_MS, AUTH_TIMEOUT_MESSAGE),
+      ]);
+      set({ loading: false, error: error?.message ?? null, session: data.session, user: data.user });
+      return error ? { ok: false, error: error.message } : { ok: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : AUTH_TIMEOUT_MESSAGE;
+      set({ loading: false, error: message });
+      return { ok: false, error: message };
+    }
   },
 
   signInWithGoogle: async (next = "/dashboard") => {

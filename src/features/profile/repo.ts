@@ -4,6 +4,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { toCamelCase, toSnakeCase } from "@/lib/supabase/case";
 import { requireUserId } from "@/lib/supabase/currentUser";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { timeoutAfter } from "@/lib/withTimeout";
 import type { BodyWeightLog, Equipment, ExperienceLevel, Goal, Injury, Profile, Sex } from "@/types/models";
 
 const LOCAL_PROFILE_ID = "local";
@@ -59,7 +60,10 @@ export async function upsertProfile(input: ProfileInput): Promise<Profile> {
     // Normally the profile row already exists (created by the handle_new_user
     // trigger on sign-up) and this just updates it. upsert() also covers the
     // case where that row is missing for any reason, instead of failing outright.
-    const { data, error } = await supabase.from("profile").upsert(payload).select().single();
+    const { data, error } = await Promise.race([
+      supabase.from("profile").upsert(payload).select().single(),
+      timeoutAfter(15000, "Guardar tu perfil está tardando demasiado. Revisa tu conexión e inténtalo de nuevo."),
+    ]);
     if (error) throw error;
     return toCamelCase<Profile>(data);
   }

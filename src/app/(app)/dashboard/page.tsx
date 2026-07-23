@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRightCircle, ChevronRight, Cpu, Play, User } from "lucide-react";
+import { ArrowRightCircle, ChevronRight, Cpu, Play, User, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
@@ -144,6 +144,22 @@ export default function DashboardPage() {
             <div className="flex-1 min-w-0">
               <p className="text-ink font-semibold">¿Qué peso debería usar hoy?</p>
               <p className="text-ink-dim text-xs mt-0.5">Toca para hablar con tu entrenador</p>
+            </div>
+            <ChevronRight size={18} className="text-ink-faint shrink-0" />
+          </div>
+        </Card>
+      </div>
+
+      <div>
+        <SectionHeader title="Veltra Food" subtitle="Registra tu comida tan fácil como un mensaje" />
+        <Card onClick={() => router.push("/food")} raised className="bg-progress-bg border-progress/30">
+          <div className="flex items-center gap-3">
+            <div className="w-11 h-11 rounded-full bg-progress/20 flex items-center justify-center shrink-0">
+              <UtensilsCrossed size={20} className="text-progress" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-ink font-semibold">¿Qué has comido hoy?</p>
+              <p className="text-ink-dim text-xs mt-0.5">Escríbelo o haz una foto y la IA calcula tus macros</p>
             </div>
             <ChevronRight size={18} className="text-ink-faint shrink-0" />
           </div>

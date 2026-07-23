@@ -185,3 +185,76 @@ export interface MemoryFact {
   active: boolean;
   createdAt: string;
 }
+
+// ---------------------------------------------------------------------
+// Veltra Food — nutrition assistant. A conversation is created per day
+// automatically; the user chats what they ate (text + photos) and the AI
+// registers meals with estimated macros that roll up into daily totals.
+// ---------------------------------------------------------------------
+
+/** One chat thread per calendar day. `date` is the local day key (YYYY-MM-DD). */
+export interface FoodConversation {
+  id: string;
+  date: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** A chat bubble in a food conversation. `photos` are data URLs (compressed client-side). */
+export interface FoodMessage {
+  id: string;
+  conversationId: string;
+  role: MessageRole;
+  content: string;
+  photos: string[];
+  mealId: string | null; // set on the assistant message that registered a meal
+  createdAt: string;
+}
+
+/** A single food item the AI detected inside a meal. */
+export interface DetectedFood {
+  name: string;
+  quantity: string; // e.g. "180 g", "1 unidad", "1 taza"
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+}
+
+/** A registered meal — the nutrition record that daily totals are summed from. */
+export interface FoodMeal {
+  id: string;
+  conversationId: string;
+  messageId: string | null;
+  date: string; // local day key (YYYY-MM-DD)
+  note: string; // short label, e.g. "Desayuno", "Comida"
+  foods: DetectedFood[];
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  createdAt: string;
+}
+
+/** Per-user daily nutrition targets. */
+export interface NutritionGoals {
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  updatedAt: string;
+}
+
+/** Aggregate of every meal on a given day — derived, never stored. */
+export interface DailyNutrition {
+  date: string;
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  mealCount: number;
+}

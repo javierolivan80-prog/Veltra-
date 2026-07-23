@@ -1,6 +1,6 @@
 "use client";
 
-import { Cpu, Home, List, User } from "lucide-react";
+import { Cpu, Home, List, User, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
@@ -11,7 +11,8 @@ import { useProfile } from "@/features/profile/hooks";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Inicio", icon: Home },
   { href: "/routines", label: "Rutinas", icon: List },
-  { href: "/coach", label: "Coach IA", icon: Cpu },
+  { href: "/food", label: "Food", icon: UtensilsCrossed },
+  { href: "/coach", label: "Coach", icon: Cpu },
   { href: "/profile", label: "Perfil", icon: User },
 ];
 
@@ -68,7 +69,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           const Icon = item.icon;
           return (
-            <Link key={item.href} href={item.href} className="flex flex-col items-center gap-1 px-4 py-2 rounded-2xl">
+            <Link key={item.href} href={item.href} className="flex flex-col items-center gap-1 px-2.5 py-2 rounded-2xl">
               <Icon size={20} className={active ? "text-progress" : "text-ink-faint"} />
               <span className={cn("text-[10px] font-semibold", active ? "text-progress" : "text-ink-faint")}>{item.label}</span>
             </Link>

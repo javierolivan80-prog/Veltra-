@@ -2,6 +2,10 @@
 
 Veltra no es una app para registrar entrenamientos — es una plataforma premium donde el objetivo es que disfrutes viendo tu progreso y quieras volver cada día. El registro es solo la herramienta; la experiencia gira en torno a la motivación, la sensación de progreso y una estética dark-first de nivel Symmetry / Whoop / Linear.
 
+## Veltra Food
+
+Módulo de nutrición integrado de forma nativa (misma identidad visual, componentes y arquitectura). Registrar una comida es tan fácil como enviar un mensaje: cada día se crea automáticamente un chat ("Hoy", "Ayer"…), el usuario escribe qué ha comido y/o adjunta fotos, y la IA analiza texto **e** imágenes juntos para estimar calorías y macros (las cantidades escritas mandan sobre la estimación visual; si hay demasiada duda, pregunta antes de registrar). Cada comida se guarda automáticamente y actualiza en tiempo real las barras de progreso del día frente a los objetivos configurables (calorías, proteínas, carbohidratos, grasas). Sin conexión / sin backend usa un estimador local determinista (`src/lib/ai/localFood.ts`); con Supabase activo llama a la misma Edge Function del entrenador (`type: "food"`, con visión de Claude). Datos en `src/features/food/` y tablas en `supabase/migrations/0002_food.sql`.
+
 ## Stack
 
 - **Next.js 16 (App Router) + TypeScript + Tailwind CSS v4**, Framer Motion para animaciones.
@@ -26,7 +30,7 @@ Este entorno de desarrollo **no tiene un proyecto Supabase real ni una clave de 
 2. Aplica el esquema:
    ```bash
    supabase link --project-ref <tu-project-ref>
-   supabase db push   # aplica supabase/migrations/0001_init.sql
+   supabase db push   # aplica supabase/migrations/0001_init.sql y 0002_food.sql
    ```
 3. Activa el proveedor **Google** en Authentication → Providers (necesitas un Client ID/Secret de Google Cloud Console) y añade `https://<tu-proyecto>.supabase.co/auth/v1/callback` como redirect URI autorizado en Google.
 4. Copia `.env.example` a `.env.local` y rellena:

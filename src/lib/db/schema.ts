@@ -4,8 +4,12 @@ import type {
   CoachMessage,
   Conversation,
   Exercise,
+  FoodConversation,
+  FoodMeal,
+  FoodMessage,
   Injury,
   MemoryFact,
+  NutritionGoals,
   PersonalRecord,
   Profile,
   Routine,
@@ -15,7 +19,10 @@ import type {
 } from "@/types/models";
 
 export const DB_NAME = "veltra";
-export const DB_VERSION = 1;
+export const DB_VERSION = 2;
+
+/** Single-row store for the local nutrition goals — mirrors the per-user Supabase row. */
+export type StoredNutritionGoals = NutritionGoals & { id: string };
 
 /** The routines store holds the routine row only — its exercises live in the separate routineExercises store, same as the Postgres schema. */
 export type StoredRoutine = Omit<Routine, "exercises">;
@@ -40,6 +47,10 @@ export interface VeltraDB extends DBSchema {
   conversations: { key: string; value: Conversation };
   coachMessages: { key: string; value: CoachMessage; indexes: { conversationId: string } };
   memoryFacts: { key: string; value: MemoryFact };
+  foodConversations: { key: string; value: FoodConversation; indexes: { date: string } };
+  foodMessages: { key: string; value: FoodMessage; indexes: { conversationId: string } };
+  foodMeals: { key: string; value: FoodMeal; indexes: { conversationId: string; date: string } };
+  nutritionGoals: { key: string; value: StoredNutritionGoals };
 }
 
 export const STORE_NAMES = [
@@ -55,4 +66,8 @@ export const STORE_NAMES = [
   "conversations",
   "coachMessages",
   "memoryFacts",
+  "foodConversations",
+  "foodMessages",
+  "foodMeals",
+  "nutritionGoals",
 ] as const;

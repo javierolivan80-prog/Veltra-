@@ -59,6 +59,9 @@ export interface Profile {
   goal: Goal;
   trainingDaysPerWeek: number;
   equipmentAvailable: Equipment[];
+  /** True once the user has finished onboarding. The signup trigger creates the
+   *  row with this false; it flips true when the profile form is submitted. */
+  onboardingCompleted: boolean;
   createdAt: string;
   updatedAt: string;
 }

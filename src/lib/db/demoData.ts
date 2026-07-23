@@ -77,6 +77,7 @@ export async function seedDemoData(db: IDBPDatabase<VeltraDB>) {
     goal: "hypertrophy",
     trainingDaysPerWeek: 3,
     equipmentAvailable: ["barbell", "dumbbell", "machine", "cable", "bodyweight", "kettlebell"],
+    onboardingCompleted: true,
     createdAt: nowIso,
     updatedAt: nowIso,
   });

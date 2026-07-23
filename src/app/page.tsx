@@ -3,14 +3,14 @@
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { Logo } from "@/design-system/components/Logo";
-import { getProfile } from "@/features/profile/repo";
+import { getProfile, isOnboarded } from "@/features/profile/repo";
 
 export default function RootGate() {
   const router = useRouter();
 
   useEffect(() => {
     getProfile()
-      .then((profile) => router.replace(profile ? "/dashboard" : "/onboarding"))
+      .then((profile) => router.replace(isOnboarded(profile) ? "/dashboard" : "/onboarding"))
       .catch(() => router.replace("/onboarding"));
   }, [router]);
 

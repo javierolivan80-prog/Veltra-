@@ -1,13 +1,13 @@
 "use client";
 
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { Button } from "@/design-system/components/Button";
 import { Card } from "@/design-system/components/Card";
 import { AccountStep } from "@/features/onboarding/AccountStep";
 import { IntroCarousel } from "@/features/onboarding/IntroCarousel";
 import { ProfileSetupForm, type ProfileFormValues } from "@/features/onboarding/ProfileSetupForm";
-import { addInjury, upsertProfile } from "@/features/profile/repo";
+import { addInjury, getProfile, isOnboarded, upsertProfile } from "@/features/profile/repo";
 import { getDb } from "@/lib/db/client";
 import { seedDemoData } from "@/lib/db/demoData";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -30,6 +30,24 @@ function OnboardingContent() {
   const [loadingDemo, setLoadingDemo] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
+
+  // Someone who already finished onboarding should never sit on this screen —
+  // e.g. a returning user who landed here while signed out and then signs in.
+  useEffect(() => {
+    getProfile()
+      .then((profile) => {
+        if (isOnboarded(profile)) router.replace("/dashboard");
+      })
+      .catch(() => {});
+  }, [router]);
+
+  // After authenticating from the onboarding flow, skip the profile form when
+  // the account already has a completed profile.
+  const handleAccountDone = async () => {
+    const profile = await getProfile().catch(() => null);
+    if (isOnboarded(profile)) router.replace("/dashboard");
+    else setStep("profile");
+  };
 
   const loadDemo = async () => {
     setLoadingDemo(true);
@@ -105,7 +123,7 @@ function OnboardingContent() {
     return (
       <div className="min-h-screen flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-sm">
-          <AccountStep fullName="" onDone={() => setStep("profile")} />
+          <AccountStep fullName="" onDone={handleAccountDone} />
         </div>
       </div>
     );

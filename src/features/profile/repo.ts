@@ -9,6 +9,16 @@ import type { BodyWeightLog, Equipment, ExperienceLevel, Goal, Injury, Profile, 
 
 const LOCAL_PROFILE_ID = "local";
 
+/**
+ * Whether the user has finished onboarding. `null` (no row) is not onboarded.
+ * A missing flag on an existing row is treated as onboarded — older local/demo
+ * profiles predate the flag and must not be bounced back into onboarding.
+ */
+export function isOnboarded(profile: Profile | null | undefined): boolean {
+  if (!profile) return false;
+  return profile.onboardingCompleted !== false;
+}
+
 export interface ProfileInput {
   fullName: string;
   sex: Sex;
@@ -82,6 +92,7 @@ export async function upsertProfile(input: ProfileInput): Promise<Profile> {
     goal: input.goal,
     trainingDaysPerWeek: input.trainingDaysPerWeek,
     equipmentAvailable: input.equipmentAvailable,
+    onboardingCompleted: true,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };

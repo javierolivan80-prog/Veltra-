@@ -7,6 +7,7 @@ import { useEffect, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Logo } from "@/design-system/components/Logo";
 import { useProfile } from "@/features/profile/hooks";
+import { isOnboarded } from "@/features/profile/repo";
 
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Inicio", icon: Home },
@@ -26,10 +27,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { data: profile, isLoading } = useProfile();
 
   useEffect(() => {
-    if (!isLoading && profile === null) router.replace("/onboarding");
+    if (!isLoading && !isOnboarded(profile)) router.replace("/onboarding");
   }, [isLoading, profile, router]);
 
-  if (isLoading || !profile) return null;
+  if (isLoading || !isOnboarded(profile)) return null;
 
   return (
     <div className="min-h-screen bg-bg md:flex">

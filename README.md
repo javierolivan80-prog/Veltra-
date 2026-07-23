@@ -2,6 +2,10 @@
 
 Veltra no es una app para registrar entrenamientos — es una plataforma premium donde el objetivo es que disfrutes viendo tu progreso y quieras volver cada día. El registro es solo la herramienta; la experiencia gira en torno a la motivación, la sensación de progreso y una estética dark-first de nivel Symmetry / Whoop / Linear.
 
+## Progreso
+
+Sección de análisis de evolución por ejercicio (nivel Hevy / Strong, con **Recharts**). El usuario busca cualquier ejercicio y ve un gráfico de área interactivo con selector de métrica (peso, reps, volumen, 1RM estimado) y filtros temporales (30 días / 3 · 6 meses / 1 año / todo). Debajo, un análisis determinista y fundamentado en datos reales (`src/features/exercises/progressAnalysis.ts`) indica en < 5 s si progresa, se estanca o retrocede (semáforo verde/amarillo/rojo), el ritmo medio de progreso, la mejora a 30/90/365 días, si va más rápido o lento de lo esperado para su nivel (usando los estándares de fuerza del sistema de rangos) y recomendaciones concretas (progresión doble, descarga, etc.). El PR se marca con insignia dorada en el gráfico y en la tarjeta.
+
 ## Veltra Food
 
 Módulo de nutrición integrado de forma nativa (misma identidad visual, componentes y arquitectura). Registrar una comida es tan fácil como enviar un mensaje: cada día se crea automáticamente un chat ("Hoy", "Ayer"…), el usuario escribe qué ha comido y/o adjunta fotos, y la IA analiza texto **e** imágenes juntos para estimar calorías y macros (las cantidades escritas mandan sobre la estimación visual; si hay demasiada duda, pregunta antes de registrar). Cada comida se guarda automáticamente y actualiza en tiempo real las barras de progreso del día frente a los objetivos configurables (calorías, proteínas, carbohidratos, grasas). Sin conexión / sin backend usa un estimador local determinista (`src/lib/ai/localFood.ts`); con Supabase activo llama a la misma Edge Function del entrenador (`type: "food"`, con visión de Claude). Datos en `src/features/food/` y tablas en `supabase/migrations/0002_food.sql`.

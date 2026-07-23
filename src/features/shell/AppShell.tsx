@@ -1,6 +1,6 @@
 "use client";
 
-import { Cpu, Home, List, User, UtensilsCrossed } from "lucide-react";
+import { Cpu, Home, List, TrendingUp, User, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
@@ -11,6 +11,7 @@ import { useProfile } from "@/features/profile/hooks";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Inicio", icon: Home },
   { href: "/routines", label: "Rutinas", icon: List },
+  { href: "/progress", label: "Progreso", icon: TrendingUp },
   { href: "/food", label: "Food", icon: UtensilsCrossed },
   { href: "/coach", label: "Coach", icon: Cpu },
   { href: "/profile", label: "Perfil", icon: User },
@@ -64,14 +65,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-4 left-4 right-4 z-50 bg-surface-raised/95 backdrop-blur border border-line-subtle rounded-[28px] shadow-2xl shadow-black/40 px-2 py-2 flex justify-around">
+      <nav className="md:hidden fixed bottom-4 left-3 right-3 z-50 bg-surface-raised/95 backdrop-blur border border-line-subtle rounded-[26px] shadow-2xl shadow-black/40 px-1 py-2 flex">
         {NAV_ITEMS.map((item) => {
           const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
           const Icon = item.icon;
           return (
-            <Link key={item.href} href={item.href} className="flex flex-col items-center gap-1 px-2.5 py-2 rounded-2xl">
-              <Icon size={20} className={active ? "text-progress" : "text-ink-faint"} />
-              <span className={cn("text-[10px] font-semibold", active ? "text-progress" : "text-ink-faint")}>{item.label}</span>
+            <Link key={item.href} href={item.href} className="flex-1 min-w-0 flex flex-col items-center gap-1 py-1.5 rounded-2xl">
+              <Icon size={19} className={active ? "text-progress" : "text-ink-faint"} />
+              <span className={cn("text-[9px] font-semibold max-w-full truncate", active ? "text-progress" : "text-ink-faint")}>{item.label}</span>
             </Link>
           );
         })}

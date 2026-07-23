@@ -110,7 +110,7 @@ export default function DashboardPage() {
       </div>
 
       <div>
-        <SectionHeader title="Récords recientes" action={recentPRs.length > 0 ? "Ver todo" : undefined} onAction={() => router.push("/routines")} />
+        <SectionHeader title="Récords recientes" action={recentPRs.length > 0 ? "Ver progreso" : undefined} onAction={() => router.push("/progress")} />
         {recentPRs.length === 0 ? (
           <Card raised>
             <EmptyState title="Todavía no hay récords" description="Registra tu primera serie y Veltra empezará a rastrear tus PRs automáticamente." />

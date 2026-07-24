@@ -1,11 +1,12 @@
 /** Client-side image downscale + JPEG re-encode.
  *
  * Meal photos are stored inline (as data URLs) and forwarded to the vision
- * model, so full-resolution camera shots would bloat the DB row and the
- * request. Capping the long edge and re-encoding to JPEG keeps each photo in
- * the low-hundreds-of-KB range while staying sharp enough to read a plate.
+ * model. The long edge is capped at 1568px — Anthropic's vision downscales
+ * anything larger, so this is the highest resolution the model actually uses,
+ * and keeping detail here directly improves food/portion recognition. JPEG
+ * 0.85 stays sharp while keeping each photo a few hundred KB.
  */
-export async function compressImage(file: File, maxEdge = 1024, quality = 0.72): Promise<string> {
+export async function compressImage(file: File, maxEdge = 1568, quality = 0.85): Promise<string> {
   const dataUrl = await readAsDataURL(file);
   const img = await loadImage(dataUrl);
 
@@ -23,7 +24,7 @@ export async function compressImage(file: File, maxEdge = 1024, quality = 0.72):
   return canvas.toDataURL("image/jpeg", quality);
 }
 
-export async function compressImages(files: File[], maxEdge = 1024, quality = 0.72): Promise<string[]> {
+export async function compressImages(files: File[], maxEdge = 1568, quality = 0.85): Promise<string[]> {
   return Promise.all(files.map((f) => compressImage(f, maxEdge, quality)));
 }
 

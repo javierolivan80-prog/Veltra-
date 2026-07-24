@@ -56,19 +56,36 @@ export async function sendFoodMessage(input: SendFoodMessageInput): Promise<Food
 
   let mealId: string | null = null;
   if (analysis.meal) {
-    const meal = await addFoodMeal({
-      conversationId,
-      messageId: null,
-      date,
-      note: analysis.meal.note,
-      foods: analysis.meal.foods,
-      calories: analysis.meal.calories,
-      protein: analysis.meal.protein,
-      carbs: analysis.meal.carbs,
-      fat: analysis.meal.fat,
-      fiber: analysis.meal.fiber,
-    });
-    mealId = meal.id;
+    const n = (v: unknown) => {
+      const x = Number(v);
+      return Number.isFinite(x) ? x : 0;
+    };
+    const foods = Array.isArray(analysis.meal.foods) ? analysis.meal.foods : [];
+    const sum = (k: "calories" | "protein" | "carbs" | "fat" | "fiber") => foods.reduce((s, f) => s + n((f as any)?.[k]), 0);
+    // Trust provided totals, fall back to summing foods when they're zero — so a
+    // slightly-inconsistent AI response still updates the daily totals.
+    const calories = n(analysis.meal.calories) || sum("calories");
+    const protein = n(analysis.meal.protein) || sum("protein");
+    const carbs = n(analysis.meal.carbs) || sum("carbs");
+    const fat = n(analysis.meal.fat) || sum("fat");
+    const fiber = n(analysis.meal.fiber) || sum("fiber");
+
+    // Only register something with actual nutrition — never a ghost 0-kcal meal.
+    if (calories > 0 || foods.length > 0) {
+      const meal = await addFoodMeal({
+        conversationId,
+        messageId: null,
+        date,
+        note: analysis.meal.note || "Comida",
+        foods,
+        calories,
+        protein,
+        carbs,
+        fat,
+        fiber,
+      });
+      mealId = meal.id;
+    }
   }
 
   return addFoodMessage(conversationId, "assistant", analysis.reply, [], mealId);

@@ -121,24 +121,87 @@ CONTEXTO DEL USUARIO:
 - Objetivos diarios: ${ctx.goalsSummary}
 - ${ctx.dailyProgressSummary}
 
-FORMATO DE SALIDA:
+FORMATO DE SALIDA (MUY IMPORTANTE):
 Escribe primero tu respuesta natural para el usuario (confirmación + feedback breve del progreso, o una pregunta si falta info).
-Si —y solo si— tienes suficiente información para registrar la comida, añade al final un bloque EXACTO con este formato (el usuario no lo verá, se procesa aparte). Todos los números en gramos salvo "calories" en kcal:
+SIEMPRE que puedas estimar la comida (aunque sea de forma aproximada), DEBES añadir al final el bloque de registro. Solo se omite el bloque cuando de verdad necesitas preguntar algo antes de registrar.
+El bloque tiene que ser EXACTAMENTE así, con las etiquetas <meal></meal> literales (NO uses \`\`\`json ni ningún otro formato). Todos los números en gramos salvo "calories" en kcal, y "calories/protein/carbs/fat/fiber" del nivel superior deben ser la SUMA de los "foods":
 <meal>{"note":"Desayuno","foods":[{"name":"Pollo","quantity":"180 g","calories":297,"protein":56,"carbs":0,"fat":6.5,"fiber":0}],"calories":297,"protein":56,"carbs":0,"fat":6.5,"fiber":0}</meal>
 Si necesitas preguntar antes de registrar, NO incluyas el bloque <meal>.`;
 }
 
+function num(v: unknown): number {
+  const n = typeof v === "string" ? Number(v.replace(",", ".")) : Number(v);
+  return Number.isFinite(n) ? n : 0;
+}
+
+function sanitizeMeal(m: any): any | null {
+  if (!m || typeof m !== "object") return null;
+  const foods = Array.isArray(m.foods)
+    ? m.foods.map((f: any) => ({
+        name: String(f?.name ?? "Alimento"),
+        quantity: String(f?.quantity ?? ""),
+        calories: num(f?.calories),
+        protein: num(f?.protein),
+        carbs: num(f?.carbs),
+        fat: num(f?.fat),
+        fiber: num(f?.fiber),
+      }))
+    : [];
+
+  const sum = (k: string) => foods.reduce((s: number, f: any) => s + num(f[k]), 0);
+  // Trust the top-level totals, but fall back to summing the foods when the
+  // model left them at zero (a common inconsistency).
+  let calories = num(m.calories);
+  let protein = num(m.protein);
+  let carbs = num(m.carbs);
+  let fat = num(m.fat);
+  let fiber = num(m.fiber);
+  if (calories === 0 && foods.length > 0) calories = sum("calories");
+  if (protein === 0 && foods.length > 0) protein = sum("protein");
+  if (carbs === 0 && foods.length > 0) carbs = sum("carbs");
+  if (fat === 0 && foods.length > 0) fat = sum("fat");
+  if (fiber === 0 && foods.length > 0) fiber = sum("fiber");
+
+  // Nothing worth registering.
+  if (foods.length === 0 && calories === 0) return null;
+
+  return { note: typeof m.note === "string" && m.note ? m.note : "Comida", foods, calories, protein, carbs, fat, fiber };
+}
+
 function extractMeal(text: string): { reply: string; meal: any | null } {
-  const match = text.match(/<meal>([\s\S]*?)<\/meal>/);
-  if (!match) return { reply: text.trim(), meal: null };
+  // Prefer the <meal> tags, but tolerate the model wrapping the JSON in a
+  // ```json fence or emitting a bare {…} object with the expected fields.
+  let jsonStr: string | null = null;
+  let matchedSlice: string | null = null;
+
+  const tag = text.match(/<meal>([\s\S]*?)<\/meal>/i);
+  if (tag) {
+    jsonStr = tag[1];
+    matchedSlice = tag[0];
+  } else {
+    const fence = text.match(/```(?:json)?\s*(\{[\s\S]*?\})\s*```/i);
+    if (fence && /"calories"/.test(fence[1])) {
+      jsonStr = fence[1];
+      matchedSlice = fence[0];
+    } else {
+      const bare = text.match(/\{[\s\S]*"calories"[\s\S]*\}/);
+      if (bare) {
+        jsonStr = bare[0];
+        matchedSlice = bare[0];
+      }
+    }
+  }
+
+  if (!jsonStr) return { reply: text.trim(), meal: null };
+
   let meal: any | null = null;
   try {
-    meal = JSON.parse(match[1]);
+    meal = sanitizeMeal(JSON.parse(jsonStr.trim()));
   } catch {
     meal = null;
   }
-  const reply = text.replace(match[0], "").trim();
-  return { reply: reply || "Registrado.", meal };
+  const reply = (matchedSlice ? text.replace(matchedSlice, "") : text).trim();
+  return { reply: reply || "Registrado ✓", meal };
 }
 
 async function handleFood(body: any): Promise<Response> {

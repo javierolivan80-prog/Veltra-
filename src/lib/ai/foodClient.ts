@@ -14,6 +14,27 @@ export interface SendFoodMessageInput {
   photos: string[]; // compressed data URLs
 }
 
+// TEMP DIAGNOSTIC — extracts the real reason an edge invoke failed.
+async function describeInvokeError(err: unknown): Promise<string> {
+  const context = (err as { context?: unknown })?.context;
+  if (context instanceof Response) {
+    try {
+      const body = await context.clone().json();
+      if (body?.error) return `${String(body.error)} (HTTP ${context.status})`;
+    } catch {
+      /* not JSON */
+    }
+    try {
+      const text = await context.text();
+      if (text) return `${text.slice(0, 300)} (HTTP ${context.status})`;
+    } catch {
+      /* ignore */
+    }
+    return `HTTP ${context.status}`;
+  }
+  return err instanceof Error ? err.message : String(err);
+}
+
 /**
  * Registers a food chat turn: stores the user's message, asks the AI (or the
  * offline estimator) to analyze text + photos, and — when the analysis yields
@@ -26,6 +47,7 @@ export async function sendFoodMessage(input: SendFoodMessageInput): Promise<Food
   await addFoodMessage(conversationId, "user", text, photos);
 
   let analysis: FoodAnalysis | null = null;
+  let debugError: string | null = null;
 
   if (isSupabaseConfigured) {
     try {
@@ -44,14 +66,20 @@ export async function sendFoodMessage(input: SendFoodMessageInput): Promise<Food
       if (error) throw error;
       if (data && typeof data.reply === "string") {
         analysis = { reply: data.reply, meal: data.meal ?? null };
+      } else if (data?.error) {
+        debugError = String(data.error);
       }
-    } catch {
+    } catch (err) {
       analysis = null;
+      // TEMP DIAGNOSTIC — surface the real edge-function failure instead of
+      // silently dropping to the offline estimator. Remove once confirmed.
+      debugError = await describeInvokeError(err);
     }
   }
 
   if (!analysis) {
     analysis = analyzeFoodLocally(text, photos.length > 0);
+    if (debugError) analysis = { ...analysis, reply: `⚠️ [debug food] ${debugError}\n\n${analysis.reply}` };
   }
 
   let mealId: string | null = null;

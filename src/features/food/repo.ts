@@ -197,6 +197,20 @@ export async function deleteFoodMeal(id: string): Promise<void> {
   await db.delete("foodMeals", id);
 }
 
+export type MealPatch = Partial<Pick<FoodMeal, "note" | "calories" | "protein" | "carbs" | "fat" | "fiber">>;
+
+/** Lets the user correct a meal's macros/label when the AI estimate was off. */
+export async function updateFoodMeal(id: string, patch: MealPatch): Promise<void> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    await supabase.from("food_meals").update(toSnakeCase(patch)).eq("id", id);
+    return;
+  }
+  const db = await getDb();
+  const existing = await db.get("foodMeals", id);
+  if (existing) await db.put("foodMeals", { ...existing, ...patch });
+}
+
 /** Daily totals are always summed from meals — never stored — so they can never drift out of sync. */
 export async function getDailyNutrition(date: string): Promise<DailyNutrition> {
   const meals = await listMealsForDate(date);

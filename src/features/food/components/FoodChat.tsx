@@ -1,17 +1,18 @@
 "use client";
 
-import { ArrowUp, ImagePlus, X } from "lucide-react";
+import { ArrowUp, ImagePlus, Pencil, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useConversationMeals, useFoodMessages, useSendFoodMessage } from "@/features/food/hooks";
 import { compressImages } from "@/lib/image";
 import { formatRelativeTime } from "@/lib/format";
 import type { FoodMeal, FoodMessage } from "@/types/models";
+import { MealEditDialog } from "./MealEditDialog";
 
 const MAX_PHOTOS = 4;
 
 const QUICK_EXAMPLES = ["Dos tostadas con tomate y un café con leche", "180 g de pollo con 200 g de arroz", "Una hamburguesa con patatas"];
 
-function MacroChips({ meal }: { meal: FoodMeal }) {
+function MacroChips({ meal, onEdit }: { meal: FoodMeal; onEdit: () => void }) {
   const chips = [
     { label: `${Math.round(meal.calories)} kcal`, color: "#2ce6a0" },
     { label: `${Math.round(meal.protein)}g P`, color: "#4da3ff" },
@@ -19,7 +20,7 @@ function MacroChips({ meal }: { meal: FoodMeal }) {
     { label: `${Math.round(meal.fat)}g G`, color: "#a374ff" },
   ];
   return (
-    <div className="mt-2 flex flex-wrap gap-1.5">
+    <button onClick={onEdit} className="mt-2 flex flex-wrap items-center gap-1.5 text-left" aria-label="Corregir comida">
       {chips.map((c) => (
         <span
           key={c.label}
@@ -29,11 +30,15 @@ function MacroChips({ meal }: { meal: FoodMeal }) {
           {c.label}
         </span>
       ))}
-    </div>
+      <span className="flex items-center gap-1 text-ink-faint text-[10px] font-medium ml-0.5">
+        <Pencil size={10} />
+        corregir
+      </span>
+    </button>
   );
 }
 
-function Bubble({ message, meal }: { message: FoodMessage; meal?: FoodMeal }) {
+function Bubble({ message, meal, onEditMeal }: { message: FoodMessage; meal?: FoodMeal; onEditMeal: (meal: FoodMeal) => void }) {
   const isUser = message.role === "user";
   return (
     <div className={`mb-3 max-w-[85%] ${isUser ? "self-end items-end" : "self-start items-start"} flex flex-col`}>
@@ -52,7 +57,7 @@ function Bubble({ message, meal }: { message: FoodMessage; meal?: FoodMeal }) {
           }`}
         >
           <p className="text-[15px] leading-5">{message.content}</p>
-          {meal ? <MacroChips meal={meal} /> : null}
+          {meal ? <MacroChips meal={meal} onEdit={() => onEditMeal(meal)} /> : null}
         </div>
       ) : null}
       <p className="text-ink-faint text-[10px] mt-1">{formatRelativeTime(message.createdAt)}</p>
@@ -68,6 +73,7 @@ export function FoodChat({ conversationId, date }: { conversationId: string; dat
   const [text, setText] = useState("");
   const [photos, setPhotos] = useState<string[]>([]);
   const [attaching, setAttaching] = useState(false);
+  const [editingMeal, setEditingMeal] = useState<FoodMeal | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -120,7 +126,7 @@ export function FoodChat({ conversationId, date }: { conversationId: string; dat
         ) : (
           <div className="flex flex-col pb-3">
             {messages.map((m) => (
-              <Bubble key={m.id} message={m} meal={m.mealId ? mealById.get(m.mealId) : undefined} />
+              <Bubble key={m.id} message={m} meal={m.mealId ? mealById.get(m.mealId) : undefined} onEditMeal={setEditingMeal} />
             ))}
             <div ref={bottomRef} />
           </div>
@@ -183,6 +189,16 @@ export function FoodChat({ conversationId, date }: { conversationId: string; dat
           <ArrowUp size={18} className="text-bg-deep" />
         </button>
       </form>
+
+      <MealEditDialog
+        meal={editingMeal}
+        conversationId={conversationId}
+        date={date}
+        open={editingMeal !== null}
+        onOpenChange={(o) => {
+          if (!o) setEditingMeal(null);
+        }}
+      />
     </div>
   );
 }

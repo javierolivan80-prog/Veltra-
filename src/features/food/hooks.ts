@@ -81,3 +81,14 @@ export function useDeleteFoodMeal() {
     },
   });
 }
+
+export function useUpdateFoodMeal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; conversationId: string; date: string; patch: repo.MealPatch }) => repo.updateFoodMeal(id, patch),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: foodKeys.meals(variables.conversationId) });
+      qc.invalidateQueries({ queryKey: foodKeys.daily(variables.date) });
+    },
+  });
+}

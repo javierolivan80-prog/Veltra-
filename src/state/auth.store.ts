@@ -17,7 +17,6 @@ interface AuthState {
   init: () => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<{ ok: boolean; error?: string; needsEmailConfirmation?: boolean }>;
   signIn: (email: string, password: string) => Promise<{ ok: boolean; error?: string }>;
-  signInWithGoogle: (next?: string) => Promise<{ ok: boolean; error?: string }>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<{ ok: boolean; error?: string }>;
   updatePassword: (password: string) => Promise<{ ok: boolean; error?: string }>;
@@ -84,16 +83,6 @@ export const useAuthStore = create<AuthState>((set, get) => ({
       set({ loading: false, error: message });
       return { ok: false, error: message };
     }
-  },
-
-  signInWithGoogle: async (next = "/dashboard") => {
-    const supabase = getSupabaseBrowserClient();
-    if (!supabase) return { ok: false, error: "Supabase no está configurado en este entorno todavía." };
-    const { error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: { redirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}` },
-    });
-    return error ? { ok: false, error: error.message } : { ok: true };
   },
 
   signOut: async () => {

@@ -40,7 +40,7 @@ export function AuthForm({ mode, fullName, onSuccess }: { mode: Mode; fullName?:
         <p className="text-warn text-sm font-semibold">Inicio de sesión en la nube no disponible</p>
         <p className="text-ink-dim text-sm mt-1.5 leading-5">
           Este entorno todavía no tiene un proyecto Supabase configurado. El sistema de cuentas está completamente implementado y listo — en
-          cuanto se añadan las claves (ver README), el registro, Google y el inicio de sesión funcionarán aquí mismo.
+          cuanto se añadan las claves (ver README), el registro y el inicio de sesión funcionarán aquí mismo.
         </p>
       </div>
     );

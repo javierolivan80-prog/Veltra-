@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRightCircle, ChevronRight, Cpu, Dumbbell, Play, User, UtensilsCrossed } from "lucide-react";
+import { ArrowRightCircle, ChevronRight, Cpu, Dumbbell, History, Play, User, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
@@ -166,6 +166,22 @@ export default function DashboardPage() {
           </div>
         </Card>
       </div>
+
+      <Link
+        href="/history"
+        className="flex items-center justify-between rounded-2xl border border-line-subtle bg-surface-raised px-5 py-4 hover:border-line transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <span className="w-9 h-9 rounded-full bg-surface flex items-center justify-center shrink-0">
+            <History size={17} className="text-ink-dim" />
+          </span>
+          <div>
+            <p className="text-ink text-sm font-semibold">Historial de entrenamientos</p>
+            <p className="text-ink-dim text-xs mt-0.5">Revisa qué hiciste cualquier día</p>
+          </div>
+        </div>
+        <ChevronRight size={18} className="text-ink-faint shrink-0" />
+      </Link>
 
       <div>
         <SectionHeader title="Veltra Food" subtitle="Registra tu comida tan fácil como un mensaje" />

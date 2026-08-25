@@ -3,6 +3,8 @@ import { listExercises } from "@/features/exercises/repo";
 import { isRankEligible } from "@/features/exercises/ranks";
 import { getSetsForExercise, listRecentSessions, getExerciseIdsInSession } from "@/features/workouts/repo";
 import { listMemoryFacts } from "@/features/coach/repo";
+import { dayKey } from "@/features/food/dates";
+import { getDailyNutrition, getNutritionGoals } from "@/features/food/repo";
 import { getProfile, listInjuries } from "@/features/profile/repo";
 import { weeklyFrequency } from "@/features/exercises/stats";
 import type { Exercise } from "@/types/models";
@@ -14,6 +16,48 @@ export interface CoachContext {
   recentSessionsSummary: string;
   strongestLifts: string;
   laggingMuscleGroups: string;
+  nutritionSummary: string;
+}
+
+/**
+ * Last few days of nutrition vs. goals, so the coach can connect training to
+ * eating ("llevas 3 días por debajo de proteína") instead of treating Veltra
+ * Food as a separate app. Days with nothing logged are skipped rather than
+ * counted as zero, which would make the average lie.
+ */
+async function buildNutritionSummary(): Promise<string> {
+  try {
+    const goals = await getNutritionGoals();
+    const days: { key: string; totals: Awaited<ReturnType<typeof getDailyNutrition>> }[] = [];
+    for (let i = 0; i < 5; i++) {
+      const d = new Date();
+      d.setDate(d.getDate() - i);
+      const key = dayKey(d);
+      days.push({ key, totals: await getDailyNutrition(key) });
+    }
+
+    const logged = days.filter((d) => d.totals.mealCount > 0);
+    if (logged.length === 0) return "El usuario no ha registrado comidas todavía en Veltra Food.";
+
+    const today = days[0].totals;
+    const avg = (pick: (t: (typeof logged)[number]["totals"]) => number) =>
+      Math.round(logged.reduce((sum, d) => sum + pick(d.totals), 0) / logged.length);
+
+    const todayLine =
+      today.mealCount > 0
+        ? `Hoy lleva ${Math.round(today.calories)} kcal, ${Math.round(today.protein)}g proteína, ${Math.round(today.carbs)}g carbos, ${Math.round(today.fat)}g grasa (${today.mealCount} comidas).`
+        : "Hoy todavía no ha registrado ninguna comida.";
+
+    return (
+      `Objetivos diarios: ${goals.calories} kcal, ${goals.protein}g proteína, ${goals.carbs}g carbos, ${goals.fat}g grasa. ` +
+      `${todayLine} ` +
+      `Media de los últimos ${logged.length} días con registro: ${avg((t) => t.calories)} kcal, ${avg((t) => t.protein)}g proteína, ` +
+      `${avg((t) => t.carbs)}g carbos, ${avg((t) => t.fat)}g grasa.`
+    );
+  } catch {
+    // Nutrition is supporting context — never let it break the coach.
+    return "Sin datos de nutrición disponibles.";
+  }
 }
 
 /**
@@ -22,12 +66,13 @@ export interface CoachContext {
  * "allowed to know" about the user, so it never has to invent anything.
  */
 export async function buildCoachContext(): Promise<CoachContext> {
-  const [profile, injuries, memory, recentSessions, exercises] = await Promise.all([
+  const [profile, injuries, memory, recentSessions, exercises, nutritionSummary] = await Promise.all([
     getProfile(),
     listInjuries(),
     listMemoryFacts(),
     listRecentSessions(8),
     listExercises(),
+    buildNutritionSummary(),
   ]);
 
   const profileSummary = profile
@@ -65,7 +110,7 @@ export async function buildCoachContext(): Promise<CoachContext> {
   }
   const strongestLifts = prSummaries.join(" | ") || "Sin PRs todavía.";
 
-  return { profileSummary, injuriesSummary, memorySummary, recentSessionsSummary, strongestLifts, laggingMuscleGroups };
+  return { profileSummary, injuriesSummary, memorySummary, recentSessionsSummary, strongestLifts, laggingMuscleGroups, nutritionSummary };
 }
 
 export async function suggestNextWeight(exerciseId: string): Promise<{ weight: number; reps: number; reasoning: string } | null> {

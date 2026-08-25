@@ -22,6 +22,7 @@ import {
   useSession,
   useSessionSets,
 } from "@/features/workouts/hooks";
+import { primeAlerts } from "@/lib/alert";
 import { cn } from "@/lib/cn";
 import { formatDuration, formatWeight } from "@/lib/format";
 import { useWorkoutSessionStore } from "@/state/workoutSession.store";
@@ -134,6 +135,9 @@ export default function ActiveWorkoutPage() {
 
   const logSet = async () => {
     if (!current) return;
+    // Unlock audio here: iOS only allows sound from an AudioContext opened
+    // inside a user gesture, and this tap is what schedules the rest alert.
+    primeAlerts();
     const result = await addSet.mutateAsync({ sessionId, exerciseId: current.exerciseId, weightKg, reps, rir, rpe });
     startRest(current.restSeconds);
 

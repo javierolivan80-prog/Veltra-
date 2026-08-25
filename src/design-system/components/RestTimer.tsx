@@ -1,7 +1,8 @@
 "use client";
 
-import { Clock } from "lucide-react";
-import { useEffect, useState } from "react";
+import { Bell, BellOff, Clock } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { isAlertMuted, playRestFinishedAlert, setAlertMuted } from "@/lib/alert";
 import { formatDuration } from "@/lib/format";
 import { useWorkoutSessionStore } from "@/state/workoutSession.store";
 import { ProgressRing } from "./ProgressRing";
@@ -10,6 +11,11 @@ export function RestTimer() {
   const restTimer = useWorkoutSessionStore((s) => s.restTimer);
   const clearRest = useWorkoutSessionStore((s) => s.clearRest);
   const [now, setNow] = useState(() => Date.now());
+  // Lazy initializer rather than an effect: this reads a synchronous browser
+  // API, so there is nothing to synchronize after mount.
+  const [muted, setMuted] = useState(() => (typeof window === "undefined" ? false : isAlertMuted()));
+  // Guards against the alert firing twice if the effect re-runs on the same rest.
+  const alertedFor = useRef<number | null>(null);
 
   useEffect(() => {
     if (!restTimer.endsAt) return;
@@ -19,9 +25,19 @@ export function RestTimer() {
 
   useEffect(() => {
     if (restTimer.endsAt && restTimer.endsAt <= now) {
+      if (alertedFor.current !== restTimer.endsAt) {
+        alertedFor.current = restTimer.endsAt;
+        playRestFinishedAlert();
+      }
       clearRest();
     }
   }, [now, restTimer.endsAt, clearRest]);
+
+  const toggleMute = () => {
+    const next = !muted;
+    setMuted(next);
+    setAlertMuted(next);
+  };
 
   if (!restTimer.endsAt) return null;
 
@@ -40,9 +56,18 @@ export function RestTimer() {
           <p className="text-ink-dim text-xs mt-1">Descanso</p>
         </div>
       </div>
-      <button onClick={clearRest} className="px-3.5 py-2 rounded-full bg-surface-raised text-ink-dim text-xs font-semibold hover:text-ink">
-        Saltar
-      </button>
+      <div className="flex items-center gap-1.5">
+        <button
+          onClick={toggleMute}
+          aria-label={muted ? "Activar aviso de descanso" : "Silenciar aviso de descanso"}
+          className="w-9 h-9 rounded-full flex items-center justify-center text-ink-faint hover:text-ink"
+        >
+          {muted ? <BellOff size={15} /> : <Bell size={15} />}
+        </button>
+        <button onClick={clearRest} className="px-3.5 py-2 rounded-full bg-surface-raised text-ink-dim text-xs font-semibold hover:text-ink">
+          Saltar
+        </button>
+      </div>
     </div>
   );
 }

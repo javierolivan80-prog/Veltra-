@@ -158,11 +158,24 @@ export async function addSet(input: AddSetInput): Promise<AddSetResult> {
 export async function deleteSet(id: string): Promise<void> {
   if (isSupabaseConfigured) {
     const supabase = getSupabaseBrowserClient()!;
+    // Drop any PR this set earned too — a record whose set no longer exists
+    // would keep inflating the exercise's stats.
+    await supabase.from("personal_records").delete().eq("set_entry_id", id);
     await supabase.from("set_entries").delete().eq("id", id);
     return;
   }
   const db = await getDb();
+  const prs = await db.getAll("personalRecords");
+  for (const pr of prs) {
+    if (pr.setEntryId === id) await db.delete("personalRecords", pr.id);
+  }
   await db.delete("setEntries", id);
+}
+
+/** Removes every set of one exercise within a session — for "I logged the wrong exercise". */
+export async function deleteExerciseFromSession(sessionId: string, exerciseId: string): Promise<void> {
+  const sets = (await getSessionSets(sessionId)).filter((s) => s.exerciseId === exerciseId);
+  for (const set of sets) await deleteSet(set.id);
 }
 
 export async function updateSet(id: string, input: Partial<Pick<SetEntry, "weightKg" | "reps" | "rir" | "rpe">>): Promise<void> {

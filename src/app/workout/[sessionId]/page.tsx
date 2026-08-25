@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, CheckCircle2, Plus } from "lucide-react";
+import { Check, Plus, Trash2, X } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { PRCelebration } from "@/design-system/components/PRCelebration";
@@ -12,7 +12,16 @@ import { useExercises } from "@/features/exercises/hooks";
 import { computeRank, isRankEligible } from "@/features/exercises/ranks";
 import { useProfile } from "@/features/profile/hooks";
 import { useRoutine } from "@/features/routines/hooks";
-import { useAddSet, useDeleteSession, useEndSession, useLastSetForExercise, useSession, useSessionSets } from "@/features/workouts/hooks";
+import {
+  useAddSet,
+  useDeleteExerciseFromSession,
+  useDeleteSession,
+  useDeleteSet,
+  useEndSession,
+  useLastSetForExercise,
+  useSession,
+  useSessionSets,
+} from "@/features/workouts/hooks";
 import { cn } from "@/lib/cn";
 import { formatDuration, formatWeight } from "@/lib/format";
 import { useWorkoutSessionStore } from "@/state/workoutSession.store";
@@ -51,9 +60,13 @@ export default function ActiveWorkoutPage() {
   const addSet = useAddSet();
   const endSession = useEndSession();
   const deleteSession = useDeleteSession();
+  const deleteSet = useDeleteSet();
+  const deleteExercise = useDeleteExerciseFromSession();
   const startRest = useWorkoutSessionStore((s) => s.startRest);
 
   const [extra, setExtra] = useState<WorkoutExercise[]>([]);
+  // Routine exercises the user dropped from *this* session only (the routine itself is untouched).
+  const [hidden, setHidden] = useState<string[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
   const [weightKg, setWeightKg] = useState(20);
   const [reps, setReps] = useState(8);
@@ -76,7 +89,10 @@ export default function ActiveWorkoutPage() {
     [routine, allExercises]
   );
 
-  const exerciseList = useMemo(() => [...routineExercises, ...extra], [routineExercises, extra]);
+  const exerciseList = useMemo(
+    () => [...routineExercises, ...extra].filter((e) => !hidden.includes(e.exerciseId)),
+    [routineExercises, extra, hidden]
+  );
   const current = exerciseList[currentIndex] ?? null;
 
   const sessionSetsForCurrent = useMemo(
@@ -143,6 +159,26 @@ export default function ActiveWorkoutPage() {
     router.replace("/dashboard");
   };
 
+  const removeSet = async (setId: string) => {
+    if (!confirm("¿Borrar esta serie? No contará en tus estadísticas.")) return;
+    await deleteSet.mutateAsync(setId);
+  };
+
+  /** Drops the exercise from this session: deletes its logged sets and, when it
+   *  was added on the fly, takes it out of the list too. */
+  const removeCurrentExercise = async () => {
+    if (!current) return;
+    const logged = sessionSets.filter((s) => s.exerciseId === current.exerciseId).length;
+    const msg = logged > 0
+      ? `¿Quitar ${current.name} de este entrenamiento? Se borrarán sus ${logged} serie${logged !== 1 ? "s" : ""} registrada${logged !== 1 ? "s" : ""}.`
+      : `¿Quitar ${current.name} de este entrenamiento?`;
+    if (!confirm(msg)) return;
+    if (logged > 0) await deleteExercise.mutateAsync({ sessionId, exerciseId: current.exerciseId });
+    setExtra((list) => list.filter((e) => e.exerciseId !== current.exerciseId));
+    setHidden((h) => [...h, current.exerciseId]);
+    setCurrentIndex(0);
+  };
+
   const cancel = async () => {
     if (!confirm("¿Cancelar este entrenamiento? Se borrará todo lo registrado en esta sesión y no contará en tu historial ni estadísticas.")) return;
     await deleteSession.mutateAsync(sessionId);
@@ -198,26 +234,47 @@ export default function ActiveWorkoutPage() {
         </div>
 
         {!current ? (
-          <div className="py-16 text-center text-ink-dim">Añade un ejercicio para empezar a registrar series.</div>
+          <div className="py-14 text-center flex flex-col items-center gap-4">
+            <p className="text-ink text-lg font-display">Elige qué vas a entrenar</p>
+            <p className="text-ink-dim text-sm max-w-xs leading-5">Añade los ejercicios que quieras hacer hoy. Puedes ir sumando más sobre la marcha.</p>
+            <button onClick={() => setPickerOpen(true)} className="mt-1 bg-progress rounded-2xl px-6 py-3.5 text-bg-deep font-bold">
+              Elegir ejercicio
+            </button>
+          </div>
         ) : (
           <>
-            <div className="mb-5">
-              <h1 className="text-ink text-2xl font-display">{current.name}</h1>
-              <p className="text-ink-dim text-sm mt-1">
-                Serie {sessionSetsForCurrent.length + 1} · objetivo {current.targetSets} × {current.targetRepsMin}-{current.targetRepsMax}
-              </p>
+            <div className="mb-5 flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h1 className="text-ink text-2xl font-display">{current.name}</h1>
+                <p className="text-ink-dim text-sm mt-1">
+                  Serie {sessionSetsForCurrent.length + 1} · objetivo {current.targetSets} × {current.targetRepsMin}-{current.targetRepsMax}
+                </p>
+              </div>
+              <button
+                onClick={removeCurrentExercise}
+                aria-label="Quitar ejercicio"
+                className="w-10 h-10 rounded-full bg-surface border border-line-subtle flex items-center justify-center text-ink-faint shrink-0"
+              >
+                <X size={16} />
+              </button>
             </div>
 
             {sessionSetsForCurrent.length > 0 ? (
               <div className="mb-5 flex flex-col gap-1.5">
                 {sessionSetsForCurrent.map((s) => (
-                  <div key={s.id} className="flex items-center justify-between bg-surface rounded-xl px-4 py-2.5">
+                  <div key={s.id} className="flex items-center gap-2 bg-surface rounded-xl pl-4 pr-1.5 py-1.5">
                     <span className="text-ink-dim text-sm font-medium">Serie {s.setNumber}</span>
-                    <span className="text-ink text-sm font-bold">
+                    <span className="text-ink text-sm font-bold flex-1 text-right">
                       {formatWeight(s.weightKg)}kg × {s.reps}
                       {s.rir !== null ? <span className="text-ink-faint font-normal"> · RIR {s.rir}</span> : null}
                     </span>
-                    <CheckCircle2 size={16} className="text-progress" />
+                    <button
+                      onClick={() => removeSet(s.id)}
+                      aria-label={`Borrar serie ${s.setNumber}`}
+                      className="w-9 h-9 flex items-center justify-center rounded-lg text-ink-faint hover:text-danger shrink-0"
+                    >
+                      <Trash2 size={15} />
+                    </button>
                   </div>
                 ))}
               </div>

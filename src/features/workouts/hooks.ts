@@ -94,6 +94,20 @@ export function useDeleteSet() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: string) => repo.deleteSet(id),
-    onSuccess: () => qc.invalidateQueries({ queryKey: workoutKeys.all }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: workoutKeys.all });
+      qc.invalidateQueries({ queryKey: exerciseKeys.all });
+    },
+  });
+}
+
+export function useDeleteExerciseFromSession() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ sessionId, exerciseId }: { sessionId: string; exerciseId: string }) => repo.deleteExerciseFromSession(sessionId, exerciseId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: workoutKeys.all });
+      qc.invalidateQueries({ queryKey: exerciseKeys.all });
+    },
   });
 }

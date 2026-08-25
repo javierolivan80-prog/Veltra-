@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRightCircle, ChevronRight, Cpu, Play, User, UtensilsCrossed } from "lucide-react";
+import { ArrowRightCircle, ChevronRight, Cpu, Dumbbell, Play, User, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
@@ -58,6 +58,16 @@ export default function DashboardPage() {
     router.push(`/workout/${session.id}`);
   };
 
+  /** Free session: no routine, the user picks each exercise as they go. */
+  const handleStartFree = async () => {
+    if (activeSession) {
+      router.push(`/workout/${activeSession.id}`);
+      return;
+    }
+    const session = await startSession.mutateAsync({ routineId: null, routineName: null });
+    router.push(`/workout/${session.id}`);
+  };
+
   const firstName = profile?.fullName?.split(" ")[0] ?? "";
 
   return (
@@ -99,6 +109,13 @@ export default function DashboardPage() {
           </div>
         </Card>
       )}
+
+      {!activeSession ? (
+        <button onClick={handleStartFree} className="-mt-2 flex items-center justify-center gap-2 py-2 text-ink-dim text-sm font-semibold hover:text-ink">
+          <Dumbbell size={15} />
+          Entrenamiento libre — elijo yo los ejercicios
+        </button>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-3">
         <Card raised>

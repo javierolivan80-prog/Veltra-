@@ -4,7 +4,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { toCamelCase, toSnakeCase } from "@/lib/supabase/case";
 import { requireUserId } from "@/lib/supabase/currentUser";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import type { DailyNutrition, DetectedFood, FoodConversation, FoodMeal, FoodMessage, MessageRole, NutritionGoals } from "@/types/models";
+import type { DailyNutrition, DetectedFood, FoodConversation, FoodMeal, FoodMessage, MessageRole, NutritionGoals, SavedMeal } from "@/types/models";
 import { dayLabel, todayKey } from "./dates";
 
 const LOCAL_GOALS_ID = "local";
@@ -262,4 +262,105 @@ export async function upsertNutritionGoals(goals: Pick<NutritionGoals, "calories
   const db = await getDb();
   await db.put("nutritionGoals", { id: LOCAL_GOALS_ID, ...next });
   return next;
+}
+
+// ---------------------------------------------------------------------
+// Saved meals ("comidas frecuentes") — one-tap templates
+// ---------------------------------------------------------------------
+
+export interface SavedMealInput {
+  name: string;
+  foods: DetectedFood[];
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+}
+
+/** Most-used first, so the meals someone actually repeats float to the top. */
+export async function listSavedMeals(): Promise<SavedMeal[]> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data, error } = await supabase.from("saved_meals").select("*").order("use_count", { ascending: false }).order("created_at", { ascending: false });
+    if (error || !data) return [];
+    return data.map((r: any) => toCamelCase<SavedMeal>(r));
+  }
+  const db = await getDb();
+  const all = await db.getAll("savedMeals");
+  return all.sort((a, b) => b.useCount - a.useCount || b.createdAt.localeCompare(a.createdAt));
+}
+
+export async function createSavedMeal(input: SavedMealInput): Promise<SavedMeal> {
+  const now = new Date().toISOString();
+  const meal: SavedMeal = { id: generateId(), useCount: 0, createdAt: now, updatedAt: now, ...input };
+
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const userId = await requireUserId();
+    const { error } = await supabase.from("saved_meals").insert({ ...toSnakeCase(meal), user_id: userId });
+    if (error) throw error;
+  } else {
+    const db = await getDb();
+    await db.put("savedMeals", meal);
+  }
+  return meal;
+}
+
+export async function updateSavedMeal(id: string, patch: Partial<SavedMealInput>): Promise<void> {
+  const updatedAt = new Date().toISOString();
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    await supabase.from("saved_meals").update({ ...toSnakeCase(patch), updated_at: updatedAt }).eq("id", id);
+    return;
+  }
+  const db = await getDb();
+  const existing = await db.get("savedMeals", id);
+  if (existing) await db.put("savedMeals", { ...existing, ...patch, updatedAt });
+}
+
+export async function deleteSavedMeal(id: string): Promise<void> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    await supabase.from("saved_meals").delete().eq("id", id);
+    return;
+  }
+  const db = await getDb();
+  await db.delete("savedMeals", id);
+}
+
+/**
+ * Logs a saved meal into a day. The macros are COPIED, not referenced, so the
+ * day's history stays accurate even if the template is later edited or deleted.
+ * A chat message is written alongside it so the conversation stays the record
+ * of what was eaten.
+ */
+export async function registerSavedMeal(saved: SavedMeal, conversationId: string, date: string): Promise<FoodMeal> {
+  const meal = await addFoodMeal({
+    conversationId,
+    messageId: null,
+    date,
+    note: saved.name,
+    foods: saved.foods,
+    calories: saved.calories,
+    protein: saved.protein,
+    carbs: saved.carbs,
+    fat: saved.fat,
+    fiber: saved.fiber,
+  });
+
+  await addFoodMessage(conversationId, "user", saved.name);
+  await addFoodMessage(conversationId, "assistant", `Añadido desde tus comidas frecuentes ✓`, [], meal.id);
+
+  // Bump usage so the list keeps ordering by what's actually repeated.
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    await supabase.from("saved_meals").update({ use_count: saved.useCount + 1 }).eq("id", saved.id);
+  } else {
+    const db = await getDb();
+    const existing = await db.get("savedMeals", saved.id);
+    if (existing) await db.put("savedMeals", { ...existing, useCount: existing.useCount + 1 });
+  }
+
+  return meal;
 }

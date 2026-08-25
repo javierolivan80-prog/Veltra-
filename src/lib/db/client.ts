@@ -43,6 +43,9 @@ export function getDb(): Promise<IDBPDatabase<VeltraDB>> {
           meals.createIndex("date", "date");
           db.createObjectStore("nutritionGoals", { keyPath: "id" });
         }
+        if (oldVersion < 3) {
+          db.createObjectStore("savedMeals", { keyPath: "id" });
+        }
       },
     }).then(async (db) => {
       await seedExerciseLibrary(db);

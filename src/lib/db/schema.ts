@@ -10,6 +10,7 @@ import type {
   Injury,
   MemoryFact,
   NutritionGoals,
+  SavedMeal,
   PersonalRecord,
   Profile,
   Routine,
@@ -19,7 +20,7 @@ import type {
 } from "@/types/models";
 
 export const DB_NAME = "veltra";
-export const DB_VERSION = 2;
+export const DB_VERSION = 3;
 
 /** Single-row store for the local nutrition goals — mirrors the per-user Supabase row. */
 export type StoredNutritionGoals = NutritionGoals & { id: string };
@@ -51,6 +52,7 @@ export interface VeltraDB extends DBSchema {
   foodMessages: { key: string; value: FoodMessage; indexes: { conversationId: string } };
   foodMeals: { key: string; value: FoodMeal; indexes: { conversationId: string; date: string } };
   nutritionGoals: { key: string; value: StoredNutritionGoals };
+  savedMeals: { key: string; value: SavedMeal };
 }
 
 export const STORE_NAMES = [
@@ -70,4 +72,5 @@ export const STORE_NAMES = [
   "foodMessages",
   "foodMeals",
   "nutritionGoals",
+  "savedMeals",
 ] as const;

@@ -1,11 +1,12 @@
 "use client";
 
-import { CalendarDays } from "lucide-react";
+import { BookMarked, CalendarDays } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { DailyProgressCard } from "@/features/food/components/DailyProgressCard";
 import { FoodChat } from "@/features/food/components/FoodChat";
 import { NutritionGoalsDialog } from "@/features/food/components/NutritionGoalsDialog";
+import { SavedMealsDialog } from "@/features/food/components/SavedMealsDialog";
 import { todayKey } from "@/features/food/dates";
 import { useDailyNutrition, useNutritionGoals, useTodayConversation } from "@/features/food/hooks";
 
@@ -18,6 +19,7 @@ export default function FoodTodayPage() {
   const { data: totals = EMPTY_TOTALS } = useDailyNutrition(date);
   const { data: goals = DEFAULT_GOALS } = useNutritionGoals();
   const [goalsOpen, setGoalsOpen] = useState(false);
+  const [savedOpen, setSavedOpen] = useState(false);
 
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)] md:h-[calc(100vh-3.5rem)]">
@@ -26,9 +28,18 @@ export default function FoodTodayPage() {
           <h1 className="text-ink text-2xl font-display">Veltra Food</h1>
           <p className="text-ink-dim text-sm mt-0.5">Hoy · registra lo que comes al instante</p>
         </div>
-        <Link href="/food/history" className="w-10 h-10 rounded-full bg-surface-raised border border-line-subtle flex items-center justify-center text-ink-dim">
-          <CalendarDays size={18} />
-        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setSavedOpen(true)}
+            aria-label="Mis comidas frecuentes"
+            className="w-10 h-10 rounded-full bg-surface-raised border border-line-subtle flex items-center justify-center text-ink-dim"
+          >
+            <BookMarked size={18} />
+          </button>
+          <Link href="/food/history" className="w-10 h-10 rounded-full bg-surface-raised border border-line-subtle flex items-center justify-center text-ink-dim">
+            <CalendarDays size={18} />
+          </Link>
+        </div>
       </div>
 
       <div className="shrink-0 mb-4">
@@ -42,6 +53,7 @@ export default function FoodTodayPage() {
       ) : null}
 
       <NutritionGoalsDialog open={goalsOpen} onOpenChange={setGoalsOpen} />
+      {conversation ? <SavedMealsDialog open={savedOpen} onOpenChange={setSavedOpen} conversationId={conversation.id} date={date} /> : null}
     </div>
   );
 }

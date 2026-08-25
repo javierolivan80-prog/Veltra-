@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { sendFoodMessage, type SendFoodMessageInput } from "@/lib/ai/foodClient";
+import type { SavedMeal } from "@/types/models";
 import * as repo from "./repo";
 
 export const foodKeys = {
@@ -12,6 +13,7 @@ export const foodKeys = {
   meals: (conversationId: string) => ["foodMeals", conversationId] as const,
   daily: (date: string) => ["foodDaily", date] as const,
   goals: ["nutritionGoals"] as const,
+  saved: ["savedMeals"] as const,
 };
 
 export function useFoodConversations() {
@@ -89,6 +91,48 @@ export function useUpdateFoodMeal() {
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: foodKeys.meals(variables.conversationId) });
       qc.invalidateQueries({ queryKey: foodKeys.daily(variables.date) });
+    },
+  });
+}
+
+export function useSavedMeals() {
+  return useQuery({ queryKey: foodKeys.saved, queryFn: repo.listSavedMeals });
+}
+
+export function useCreateSavedMeal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: repo.SavedMealInput) => repo.createSavedMeal(input),
+    onSuccess: () => qc.invalidateQueries({ queryKey: foodKeys.saved }),
+  });
+}
+
+export function useUpdateSavedMeal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, patch }: { id: string; patch: Partial<repo.SavedMealInput> }) => repo.updateSavedMeal(id, patch),
+    onSuccess: () => qc.invalidateQueries({ queryKey: foodKeys.saved }),
+  });
+}
+
+export function useDeleteSavedMeal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => repo.deleteSavedMeal(id),
+    onSuccess: () => qc.invalidateQueries({ queryKey: foodKeys.saved }),
+  });
+}
+
+export function useRegisterSavedMeal() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ saved, conversationId, date }: { saved: SavedMeal; conversationId: string; date: string }) =>
+      repo.registerSavedMeal(saved, conversationId, date),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: foodKeys.messages(variables.conversationId) });
+      qc.invalidateQueries({ queryKey: foodKeys.meals(variables.conversationId) });
+      qc.invalidateQueries({ queryKey: foodKeys.daily(variables.date) });
+      qc.invalidateQueries({ queryKey: foodKeys.saved });
     },
   });
 }

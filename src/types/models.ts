@@ -251,6 +251,23 @@ export interface NutritionGoals {
   updatedAt: string;
 }
 
+/** A meal the user eats often, saved as a one-tap template (e.g. "3 huevos
+ *  revueltos con 2 lonchas de havarti"). Registering one copies its macros
+ *  into the day, so editing the template never rewrites past days. */
+export interface SavedMeal {
+  id: string;
+  name: string;
+  foods: DetectedFood[];
+  calories: number;
+  protein: number;
+  carbs: number;
+  fat: number;
+  fiber: number;
+  useCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
 /** Aggregate of every meal on a given day — derived, never stored. */
 export interface DailyNutrition {
   date: string;

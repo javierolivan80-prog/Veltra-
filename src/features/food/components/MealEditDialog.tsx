@@ -1,11 +1,11 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { BookMarked, Trash2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Button } from "@/design-system/components/Button";
 import { Dialog } from "@/design-system/components/Dialog";
 import { TextField } from "@/design-system/components/TextField";
-import { useDeleteFoodMeal, useUpdateFoodMeal } from "@/features/food/hooks";
+import { useCreateSavedMeal, useDeleteFoodMeal, useUpdateFoodMeal } from "@/features/food/hooks";
 import type { FoodMeal } from "@/types/models";
 
 const int = (s: string) => Math.max(0, Math.round(Number(s.replace(/[^0-9.]/g, "")) || 0));
@@ -25,6 +25,8 @@ export function MealEditDialog({
 }) {
   const update = useUpdateFoodMeal();
   const remove = useDeleteFoodMeal();
+  const saveAsFrequent = useCreateSavedMeal();
+  const [savedOk, setSavedOk] = useState(false);
 
   const [note, setNote] = useState("");
   const [calories, setCalories] = useState("");
@@ -52,6 +54,20 @@ export function MealEditDialog({
       patch: { note: note.trim() || "Comida", calories: int(calories), protein: int(protein), carbs: int(carbs), fat: int(fat) },
     });
     onOpenChange(false);
+  };
+
+  /** Stores the current (possibly corrected) values as a reusable template. */
+  const keepAsFrequent = async () => {
+    await saveAsFrequent.mutateAsync({
+      name: note.trim() || "Comida",
+      foods: meal.foods,
+      calories: int(calories),
+      protein: int(protein),
+      carbs: int(carbs),
+      fat: int(fat),
+      fiber: meal.fiber,
+    });
+    setSavedOk(true);
   };
 
   const del = async () => {
@@ -88,6 +104,15 @@ export function MealEditDialog({
         ) : null}
 
         <Button label="Guardar cambios" onClick={save} loading={update.isPending} fullWidth size="lg" />
+
+        <button
+          onClick={keepAsFrequent}
+          disabled={saveAsFrequent.isPending || savedOk}
+          className="flex items-center justify-center gap-2 py-3 text-ink-dim text-sm font-semibold disabled:opacity-60"
+        >
+          <BookMarked size={15} />
+          {savedOk ? "Guardada en tus frecuentes ✓" : "Guardar como comida frecuente"}
+        </button>
         <button onClick={del} className="flex items-center justify-center gap-2 py-3 text-danger text-sm font-semibold">
           <Trash2 size={15} />
           Eliminar comida

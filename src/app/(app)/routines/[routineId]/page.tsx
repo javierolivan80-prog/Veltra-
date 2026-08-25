@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronLeft, Trash2 } from "lucide-react";
+import { ChevronLeft, Pencil, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { Button } from "@/design-system/components/Button";
@@ -38,9 +38,18 @@ export default function RoutineDetailPage() {
         <Link href="/routines" className="w-9 h-9 rounded-full bg-surface-raised flex items-center justify-center text-ink-dim">
           <ChevronLeft size={18} />
         </Link>
-        <button onClick={handleDelete} className="w-9 h-9 rounded-full bg-surface-raised flex items-center justify-center text-danger">
-          <Trash2 size={16} />
-        </button>
+        <div className="flex items-center gap-2">
+          <Link
+            href={`/routines/${routine.id}/edit`}
+            className="flex items-center gap-1.5 px-4 py-2 rounded-full bg-surface-raised border border-line-subtle text-ink-dim text-sm font-semibold"
+          >
+            <Pencil size={14} />
+            Editar
+          </Link>
+          <button onClick={handleDelete} aria-label="Eliminar rutina" className="w-9 h-9 rounded-full bg-surface-raised flex items-center justify-center text-danger">
+            <Trash2 size={16} />
+          </button>
+        </div>
       </div>
 
       <div>

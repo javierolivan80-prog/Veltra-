@@ -17,14 +17,13 @@ export default function RecoveryPage() {
         <h1 className="text-ink font-display font-semibold text-[28px] leading-tight tracking-tight mt-1.5">Recuperación</h1>
       </div>
 
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col">
         <ModuleCard
           href="/addictions"
           icon={ShieldAlert}
           name="Adicciones"
           quickStat={addictions.length > 0 ? `${addictions.length} en seguimiento` : "Sin seguimiento"}
           colorClass="text-addiction"
-          bgClass="bg-addiction-bg"
         />
         <ModuleCard
           href="/screen-time"
@@ -32,7 +31,7 @@ export default function RecoveryPage() {
           name="Screen Time"
           quickStat={todayScreenTime ? `${todayScreenTime.hours}h hoy` : "Sin registrar hoy"}
           colorClass="text-addiction"
-          bgClass="bg-addiction-bg"
+          last
         />
       </div>
     </div>

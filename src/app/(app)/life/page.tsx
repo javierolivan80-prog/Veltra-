@@ -20,14 +20,13 @@ export default function LifePage() {
         <h1 className="text-ink font-display font-semibold text-[28px] leading-tight tracking-tight mt-1.5">Vida</h1>
       </div>
 
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col">
         <ModuleCard
           href="/finances"
           icon={Wallet}
           name="Finanzas"
           quickStat={noSpendStreak > 0 ? `Racha de ${noSpendStreak} días` : "Registra un gasto"}
           colorClass="text-record"
-          bgClass="bg-record-bg"
         />
         <ModuleCard
           href="/goals"
@@ -35,7 +34,7 @@ export default function LifePage() {
           name="Metas"
           quickStat={goals.length > 0 ? `${goals.length} activas` : "Crea tu primera meta"}
           colorClass="text-record"
-          bgClass="bg-record-bg"
+          last
         />
       </div>
     </div>

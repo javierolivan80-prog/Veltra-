@@ -28,38 +28,35 @@ export default function MindPage() {
         <h1 className="text-ink font-display font-semibold text-[28px] leading-tight tracking-tight mt-1.5">Mente</h1>
       </div>
 
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col">
         <ModuleCard
           href="/habits"
           icon={CheckCircle2}
           name="Hábitos"
           quickStat={habits.length > 0 ? `${todayLogs.length}/${habits.length} hoy` : "Crea tu primer hábito"}
           colorClass="text-progress"
-          bgClass="bg-progress-bg"
         />
         <ModuleCard
           href="/meditation"
           icon={Wind}
           name="Meditación"
           quickStat={meditationStreak > 0 ? `Racha de ${meditationStreak} días` : "Empieza hoy"}
-          colorClass="text-progress"
-          bgClass="bg-progress-bg"
+          colorClass="text-ai"
         />
         <ModuleCard
           href="/journal"
           icon={BookOpen}
           name="Journaling"
           quickStat={todayEntry ? "Escrito hoy" : "Sin escribir hoy"}
-          colorClass="text-progress"
-          bgClass="bg-progress-bg"
+          colorClass="text-ai"
         />
         <ModuleCard
           href="/focus"
           icon={Timer}
           name="Foco"
           quickStat={focusToday > 0 ? `${focusToday} bloques hoy` : "Sin bloques hoy"}
-          colorClass="text-progress"
-          bgClass="bg-progress-bg"
+          colorClass="text-ai"
+          last
         />
       </div>
     </div>

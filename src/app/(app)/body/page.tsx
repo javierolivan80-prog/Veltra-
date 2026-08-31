@@ -24,14 +24,13 @@ export default function BodyPage() {
         <h1 className="text-ink font-display font-semibold text-[28px] leading-tight tracking-tight mt-1.5">Cuerpo</h1>
       </div>
 
-      <div className="flex flex-col gap-2.5">
+      <div className="flex flex-col">
         <ModuleCard
           href="/routines"
           icon={Dumbbell}
           name="Ejercicio"
           quickStat={streak > 0 ? `Racha de ${streak} días` : "Empieza tu racha"}
-          colorClass="text-info"
-          bgClass="bg-info-bg"
+          colorClass="text-progress"
         />
         <ModuleCard
           href="/sleep"
@@ -39,15 +38,13 @@ export default function BodyPage() {
           name="Sueño"
           quickStat={lastNight ? `${formatHoursMinutes(sleptMinutes(lastNight))} anoche` : "Sin registrar"}
           colorClass="text-sleep"
-          bgClass="bg-sleep-bg"
         />
         <ModuleCard
           href="/food"
           icon={UtensilsCrossed}
           name="Nutrición"
           quickStat={nutrition && nutrition.mealCount > 0 ? `${Math.round(nutrition.calories)} kcal hoy` : "Sin registrar hoy"}
-          colorClass="text-info"
-          bgClass="bg-info-bg"
+          colorClass="text-progress"
         />
         <ModuleCard
           href="/weight"
@@ -55,7 +52,7 @@ export default function BodyPage() {
           name="Peso"
           quickStat={profile?.bodyweightKg ? `${profile.bodyweightKg} kg` : "Sin registrar"}
           colorClass="text-info"
-          bgClass="bg-info-bg"
+          last
         />
       </div>
     </div>

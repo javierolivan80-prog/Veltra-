@@ -1,5 +1,7 @@
 import type { DBSchema } from "idb";
 import type {
+  Addiction,
+  AddictionRelapse,
   BodyWeightLog,
   CoachMessage,
   Conversation,
@@ -7,20 +9,24 @@ import type {
   FoodConversation,
   FoodMeal,
   FoodMessage,
+  Habit,
+  HabitLog,
   Injury,
   MemoryFact,
   NutritionGoals,
   SavedMeal,
   PersonalRecord,
   Profile,
+  PushSubscriptionRow,
   Routine,
   RoutineExercise,
   SetEntry,
+  SleepLog,
   WorkoutSession,
 } from "@/types/models";
 
 export const DB_NAME = "veltra";
-export const DB_VERSION = 3;
+export const DB_VERSION = 4;
 
 /** Single-row store for the local nutrition goals — mirrors the per-user Supabase row. */
 export type StoredNutritionGoals = NutritionGoals & { id: string };
@@ -53,6 +59,12 @@ export interface VeltraDB extends DBSchema {
   foodMeals: { key: string; value: FoodMeal; indexes: { conversationId: string; date: string } };
   nutritionGoals: { key: string; value: StoredNutritionGoals };
   savedMeals: { key: string; value: SavedMeal };
+  habits: { key: string; value: Habit };
+  habitLogs: { key: string; value: HabitLog; indexes: { habitId: string } };
+  sleepLogs: { key: string; value: SleepLog; indexes: { date: string } };
+  addictions: { key: string; value: Addiction };
+  addictionRelapses: { key: string; value: AddictionRelapse; indexes: { addictionId: string } };
+  pushSubscriptions: { key: string; value: PushSubscriptionRow };
 }
 
 export const STORE_NAMES = [
@@ -73,4 +85,10 @@ export const STORE_NAMES = [
   "foodMeals",
   "nutritionGoals",
   "savedMeals",
+  "habits",
+  "habitLogs",
+  "sleepLogs",
+  "addictions",
+  "addictionRelapses",
+  "pushSubscriptions",
 ] as const;

@@ -46,6 +46,14 @@ export function getDb(): Promise<IDBPDatabase<VeltraDB>> {
         if (oldVersion < 3) {
           db.createObjectStore("savedMeals", { keyPath: "id" });
         }
+        if (oldVersion < 4) {
+          db.createObjectStore("habits", { keyPath: "id" });
+          db.createObjectStore("habitLogs", { keyPath: "id" }).createIndex("habitId", "habitId");
+          db.createObjectStore("sleepLogs", { keyPath: "id" }).createIndex("date", "date");
+          db.createObjectStore("addictions", { keyPath: "id" });
+          db.createObjectStore("addictionRelapses", { keyPath: "id" }).createIndex("addictionId", "addictionId");
+          db.createObjectStore("pushSubscriptions", { keyPath: "id" });
+        }
       },
     }).then(async (db) => {
       await seedExerciseLibrary(db);

@@ -286,7 +286,10 @@ export default function ActiveWorkoutPage() {
 
             <div className="bg-surface-raised border border-line-subtle rounded-3xl p-5 mb-5">
               <div className="flex justify-around mb-5">
-                <Stepper label="PESO (KG)" value={weightKg} step={2.5} min={0} max={500} format={formatWeight} onChange={setWeightKg} />
+                <div className="flex flex-col items-center">
+                  <Stepper label="PESO (KG)" value={weightKg} step={2.5} min={0} max={500} format={formatWeight} onChange={setWeightKg} />
+                  {crossSessionLast ? <p className="text-ink-faint text-[11px] mt-1.5">Último: {formatWeight(crossSessionLast.weightKg)}kg</p> : null}
+                </div>
                 <Stepper label="REPS" value={reps} step={1} min={0} max={100} onChange={setReps} />
               </div>
               <div className="flex justify-around">

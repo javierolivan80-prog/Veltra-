@@ -1,6 +1,6 @@
 import { cn } from "@/lib/cn";
 
-type Tone = "progress" | "info" | "ai" | "warn" | "record" | "neutral" | "danger";
+type Tone = "progress" | "info" | "ai" | "warn" | "record" | "neutral" | "danger" | "sleep" | "addiction";
 
 const TONE_CLASSES: Record<Tone, string> = {
   progress: "bg-progress-bg text-progress",
@@ -10,6 +10,8 @@ const TONE_CLASSES: Record<Tone, string> = {
   record: "bg-record-bg text-record",
   neutral: "bg-surface-raised text-ink-dim",
   danger: "bg-danger-bg text-danger",
+  sleep: "bg-sleep-bg text-sleep",
+  addiction: "bg-addiction-bg text-addiction",
 };
 
 export function Badge({ label, tone = "neutral" }: { label: string; tone?: Tone }) {

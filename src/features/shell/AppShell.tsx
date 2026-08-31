@@ -1,6 +1,6 @@
 "use client";
 
-import { Cpu, Home, List, TrendingUp, User, UtensilsCrossed } from "lucide-react";
+import { CheckCircle2, Cpu, Home, List, Moon, ShieldAlert, TrendingUp, User, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
@@ -10,12 +10,15 @@ import { useProfile } from "@/features/profile/hooks";
 import { isOnboarded } from "@/features/profile/repo";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Inicio", icon: Home },
-  { href: "/routines", label: "Rutinas", icon: List },
-  { href: "/progress", label: "Progreso", icon: TrendingUp },
-  { href: "/food", label: "Food", icon: UtensilsCrossed },
-  { href: "/coach", label: "Coach", icon: Cpu },
-  { href: "/profile", label: "Perfil", icon: User },
+  { href: "/dashboard", label: "Inicio", icon: Home, activeColor: "text-progress" },
+  { href: "/routines", label: "Rutinas", icon: List, activeColor: "text-progress" },
+  { href: "/progress", label: "Progreso", icon: TrendingUp, activeColor: "text-progress" },
+  { href: "/habits", label: "Hábitos", icon: CheckCircle2, activeColor: "text-progress" },
+  { href: "/sleep", label: "Sueño", icon: Moon, activeColor: "text-sleep" },
+  { href: "/addictions", label: "Adicciones", icon: ShieldAlert, activeColor: "text-addiction" },
+  { href: "/food", label: "Food", icon: UtensilsCrossed, activeColor: "text-progress" },
+  { href: "/coach", label: "Coach", icon: Cpu, activeColor: "text-ai" },
+  { href: "/profile", label: "Perfil", icon: User, activeColor: "text-progress" },
 ];
 
 export function AppShell({ children }: { children: ReactNode }) {
@@ -52,7 +55,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   active ? "bg-surface-raised text-ink" : "text-ink-dim hover:text-ink hover:bg-surface"
                 )}
               >
-                <Icon size={18} className={active ? "text-progress" : ""} />
+                <Icon size={18} className={active ? item.activeColor : ""} />
                 {item.label}
               </Link>
             );
@@ -72,8 +75,8 @@ export function AppShell({ children }: { children: ReactNode }) {
           const Icon = item.icon;
           return (
             <Link key={item.href} href={item.href} className="flex-1 min-w-0 flex flex-col items-center gap-1 py-1.5 rounded-2xl">
-              <Icon size={19} className={active ? "text-progress" : "text-ink-faint"} />
-              <span className={cn("text-[9px] font-semibold max-w-full truncate", active ? "text-progress" : "text-ink-faint")}>{item.label}</span>
+              <Icon size={19} className={active ? item.activeColor : "text-ink-faint"} />
+              <span className={cn("text-[9px] font-semibold max-w-full truncate", active ? item.activeColor : "text-ink-faint")}>{item.label}</span>
             </Link>
           );
         })}

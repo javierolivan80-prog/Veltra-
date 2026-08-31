@@ -18,6 +18,12 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Veltra",
   description: "Disfruta viendo cómo progresas.",
+  manifest: "/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Veltra",
+  },
 };
 
 export const viewport: Viewport = {

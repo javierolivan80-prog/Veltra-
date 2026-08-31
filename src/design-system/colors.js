@@ -50,6 +50,16 @@ const colors = {
     DEFAULT: "#FF5470",
     bg: "#2E0E17",
   },
+  sleep: {
+    DEFAULT: "#8B93FF",
+    dim: "#5D63C9",
+    bg: "#16173A",
+  },
+  addiction: {
+    DEFAULT: "#FF6A3D",
+    dim: "#C9502A",
+    bg: "#2E150C",
+  },
   rank: {
     bronze: "#C67A3E",
     silver: "#C7CDD6",

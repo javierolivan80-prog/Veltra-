@@ -5,7 +5,10 @@
  * Audio is synthesized with WebAudio so there's no asset to ship or fail to
  * load. iOS only allows playback from an AudioContext created/resumed inside a
  * user gesture, so `primeAlerts()` must be called from the tap that starts the
- * rest — after that the timer can beep on its own.
+ * rest — after that the timer can beep on its own. That same tap is also used
+ * to ask for Notification permission, for the same reason: browsers require a
+ * user gesture in the chain, and asking mid-rest (no gesture) would be a
+ * silent no-op.
  *
  * Vibration is best-effort: iOS Safari ignores navigator.vibrate entirely.
  */
@@ -30,7 +33,8 @@ export function setAlertMuted(muted: boolean): void {
   }
 }
 
-/** Call from a user gesture so the browser lets us make sound later. */
+/** Call from a user gesture so the browser lets us make sound (and ask for
+ *  notification permission) later. */
 export function primeAlerts(): void {
   if (typeof window === "undefined" || isAlertMuted()) return;
   try {
@@ -40,6 +44,11 @@ export function primeAlerts(): void {
     if (ctx.state === "suspended") void ctx.resume();
   } catch {
     ctx = null;
+  }
+
+  // A no-op once the user has already answered — safe to call every time.
+  if ("Notification" in window && Notification.permission === "default") {
+    void Notification.requestPermission();
   }
 }
 
@@ -77,5 +86,13 @@ export function playRestFinishedAlert(): void {
     navigator.vibrate?.([160, 90, 160, 90, 260]);
   } catch {
     // unsupported (notably iOS Safari)
+  }
+
+  try {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification("¡Tiempo!", { body: "Set completado", icon: "/icon.svg", tag: "rest-timer" });
+    }
+  } catch {
+    // never let a notification failure break the timer
   }
 }

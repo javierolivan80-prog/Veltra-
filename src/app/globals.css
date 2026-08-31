@@ -45,6 +45,14 @@
   --color-danger: #ff5470;
   --color-danger-bg: #2e0e17;
 
+  --color-sleep: #8b93ff;
+  --color-sleep-dim: #5d63c9;
+  --color-sleep-bg: #16173a;
+
+  --color-addiction: #ff6a3d;
+  --color-addiction-dim: #c9502a;
+  --color-addiction-bg: #2e150c;
+
   --color-rank-bronze: #c67a3e;
   --color-rank-silver: #c7cdd6;
   --color-rank-gold: #f5c453;

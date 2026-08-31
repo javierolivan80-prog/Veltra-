@@ -278,3 +278,81 @@ export interface DailyNutrition {
   fiber: number;
   mealCount: number;
 }
+
+// ---------------------------------------------------------------------
+// Hábitos — a habit the user checks in on daily, with an optional
+// notification time. One HabitLog per (habitId, date).
+// ---------------------------------------------------------------------
+
+export interface Habit {
+  id: string;
+  name: string;
+  notificationTime: string | null; // "HH:MM", local to `timezone`
+  timezone: string | null; // IANA tz captured client-side at creation
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type HabitLogStatus = "done" | "not_done" | "skipped";
+
+export interface HabitLog {
+  id: string;
+  habitId: string;
+  date: string; // local day key (YYYY-MM-DD)
+  status: HabitLogStatus;
+  respondedAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Sueño — one entry per night, keyed by the local date the user went to
+// bed. All duration/latency figures are derived from the four times, not
+// stored redundantly.
+// ---------------------------------------------------------------------
+
+export interface SleepLog {
+  id: string;
+  date: string; // local day key (YYYY-MM-DD) of the night this entry covers
+  bedTime: string; // "HH:MM"
+  sleepTime: string; // "HH:MM" — may roll past midnight relative to bedTime
+  wakeTime: string; // "HH:MM" — may roll past midnight relative to sleepTime
+  riseTime: string; // "HH:MM"
+  quality: number | null; // 1-10
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Adicciones — tracks time since the last relapse. `startDate` is when
+// tracking began; the active streak starts at the most recent relapse's
+// `fallenAt`, or `startDate` if there's none yet.
+// ---------------------------------------------------------------------
+
+export interface Addiction {
+  id: string;
+  name: string;
+  motivation: string | null;
+  startDate: string; // ISO datetime
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AddictionRelapse {
+  id: string;
+  addictionId: string;
+  fallenAt: string; // ISO datetime
+  reason: string | null;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Push notification subscriptions (Habits background reminders).
+// ---------------------------------------------------------------------
+
+export interface PushSubscriptionRow {
+  id: string;
+  endpoint: string;
+  p256dh: string;
+  authKey: string;
+  createdAt: string;
+}

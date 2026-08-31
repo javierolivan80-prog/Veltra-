@@ -20,8 +20,8 @@ export default function BodyPage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <p className="text-ink-dim text-sm">Categoría</p>
-        <h1 className="text-ink text-2xl font-display mt-0.5">Cuerpo</h1>
+        <p className="text-ink-faint text-[11px] font-semibold uppercase tracking-[.14em]">Ejercicio · Sueño · Nutrición · Peso</p>
+        <h1 className="text-ink font-display font-semibold text-[28px] leading-tight tracking-tight mt-1.5">Cuerpo</h1>
       </div>
 
       <div className="flex flex-col gap-2.5">

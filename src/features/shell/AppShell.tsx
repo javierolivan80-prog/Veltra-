@@ -1,6 +1,6 @@
 "use client";
 
-import { Heart, Home, Sparkles, ShieldAlert, Target, User } from "lucide-react";
+import { Brain, Dumbbell, Home, ShieldAlert, Target, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
@@ -10,9 +10,9 @@ import { useProfile } from "@/features/profile/hooks";
 import { isOnboarded } from "@/features/profile/repo";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Hoy", icon: Home, activeColor: "text-ink" },
-  { href: "/body", label: "Cuerpo", icon: Heart, activeColor: "text-info" },
-  { href: "/mind", label: "Mente", icon: Sparkles, activeColor: "text-progress" },
+  { href: "/dashboard", label: "Hoy", icon: Home, activeColor: "text-progress" },
+  { href: "/body", label: "Cuerpo", icon: Dumbbell, activeColor: "text-info" },
+  { href: "/mind", label: "Mente", icon: Brain, activeColor: "text-progress" },
   { href: "/recovery", label: "Recuperación", icon: ShieldAlert, activeColor: "text-addiction" },
   { href: "/life", label: "Vida", icon: Target, activeColor: "text-record" },
 ];
@@ -89,14 +89,14 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
 
       {/* Mobile bottom nav */}
-      <nav className="md:hidden fixed bottom-4 left-3 right-3 z-50 bg-surface-raised/95 backdrop-blur border border-line-subtle rounded-[26px] shadow-2xl shadow-black/40 px-1 py-2 flex">
+      <nav className="md:hidden fixed bottom-4 left-3 right-3 z-50 bg-[#101010]/95 backdrop-blur-[16px] border border-line-subtle rounded-[18px] shadow-2xl shadow-black/40 px-1.5 py-2.5 flex">
         {NAV_ITEMS.map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
           return (
-            <Link key={item.href} href={item.href} className="flex-1 min-w-0 flex flex-col items-center gap-1 py-1.5 rounded-2xl">
-              <Icon size={19} className={active ? item.activeColor : "text-ink-faint"} />
-              <span className={cn("text-[9px] font-semibold max-w-full truncate", active ? item.activeColor : "text-ink-faint")}>{item.label}</span>
+            <Link key={item.href} href={item.href} className="flex-1 min-w-0 flex flex-col items-center gap-1.5 py-1 rounded-2xl">
+              <Icon size={20} className={active ? item.activeColor : "text-ink-faint"} />
+              <span className={cn("text-[10px] font-semibold max-w-full truncate", active ? item.activeColor : "text-ink-faint")}>{item.label}</span>
             </Link>
           );
         })}

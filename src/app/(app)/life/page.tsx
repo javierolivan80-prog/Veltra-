@@ -16,8 +16,8 @@ export default function LifePage() {
   return (
     <div className="flex flex-col gap-6">
       <div>
-        <p className="text-ink-dim text-sm">Categoría</p>
-        <h1 className="text-ink text-2xl font-display mt-0.5">Vida</h1>
+        <p className="text-ink-faint text-[11px] font-semibold uppercase tracking-[.14em]">Finanzas · Metas</p>
+        <h1 className="text-ink font-display font-semibold text-[28px] leading-tight tracking-tight mt-1.5">Vida</h1>
       </div>
 
       <div className="flex flex-col gap-2.5">

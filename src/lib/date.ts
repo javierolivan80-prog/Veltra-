@@ -35,3 +35,19 @@ export function shiftDayKey(key: string, deltaDays: number): string {
 export function lastNDayKeys(n: number, endKey: string = todayKey()): string[] {
   return Array.from({ length: n }, (_, i) => shiftDayKey(endKey, -(n - 1 - i)));
 }
+
+const WEEKDAY_NAMES_ES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
+
+/** ISO-8601 week number (1-53), Monday as the first day of the week. */
+export function isoWeekNumber(date: Date = new Date()): number {
+  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
+  const dayNum = d.getUTCDay() || 7;
+  d.setUTCDate(d.getUTCDate() + 4 - dayNum);
+  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
+  return Math.ceil(((d.getTime() - yearStart.getTime()) / 86400000 + 1) / 7);
+}
+
+/** "Lunes 31 · Semana 36" — the kicker shown atop "Hoy". */
+export function todayKicker(date: Date = new Date()): string {
+  return `${WEEKDAY_NAMES_ES[date.getDay()]} ${date.getDate()} · Semana ${isoWeekNumber(date)}`;
+}

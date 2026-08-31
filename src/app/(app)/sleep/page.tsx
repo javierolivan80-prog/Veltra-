@@ -3,6 +3,7 @@
 import { Moon, Pencil, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Card } from "@/design-system/components/Card";
+import { CategoryBackLink } from "@/design-system/components/CategoryBackLink";
 import { EmptyState } from "@/design-system/components/EmptyState";
 import { LineChart } from "@/design-system/charts/LineChart";
 import { ProgressRing } from "@/design-system/components/ProgressRing";
@@ -53,8 +54,9 @@ export default function SleepPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <CategoryBackLink href="/body" label="Cuerpo" />
       <div>
-        <p className="text-ink-dim text-sm">Descanso</p>
+        <p className="text-ink-dim text-sm">Cuerpo</p>
         <h1 className="text-ink text-2xl font-display mt-0.5">Sueño</h1>
       </div>
 

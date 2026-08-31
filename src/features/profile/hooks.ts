@@ -64,3 +64,11 @@ export function useAddBodyWeightLog() {
     },
   });
 }
+
+export function useUpdateTargetWeight() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (kg: number | null) => repo.updateTargetWeight(kg),
+    onSuccess: () => qc.invalidateQueries({ queryKey: profileKeys.profile }),
+  });
+}

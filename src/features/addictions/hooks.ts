@@ -23,6 +23,10 @@ export function useRelapses(addictionId: string | null) {
   return useQuery({ queryKey: addictionKeys.relapses(addictionId ?? ""), queryFn: () => repo.listRelapses(addictionId!), enabled: !!addictionId });
 }
 
+export function useAllRelapses() {
+  return useQuery({ queryKey: [...addictionKeys.all, "allRelapses"] as const, queryFn: repo.listAllRelapses });
+}
+
 export function useCreateAddiction() {
   const qc = useQueryClient();
   return useMutation({

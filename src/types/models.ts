@@ -62,6 +62,8 @@ export interface Profile {
   /** True once the user has finished onboarding. The signup trigger creates the
    *  row with this false; it flips true when the profile form is submitted. */
   onboardingCompleted: boolean;
+  /** Optional goal weight shown as progress on the Peso page. */
+  targetWeightKg: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -354,5 +356,117 @@ export interface PushSubscriptionRow {
   endpoint: string;
   p256dh: string;
   authKey: string;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Cuerpo — Nutrición: agua y check simple de comidas, vive dentro de Food.
+// One row per (day).
+// ---------------------------------------------------------------------
+
+export interface WaterLog {
+  id: string;
+  date: string; // local day key (YYYY-MM-DD)
+  count: number;
+  updatedAt: string;
+}
+
+export type MealCheckStatus = "good" | "ok" | "bad";
+
+export interface MealCheck {
+  id: string;
+  date: string;
+  status: MealCheckStatus;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Mente — Meditación: una fila por sesión completada.
+// ---------------------------------------------------------------------
+
+export interface MeditationSession {
+  id: string;
+  durationMinutes: number;
+  completedAt: string;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Mente — Journaling: una entrada por día.
+// ---------------------------------------------------------------------
+
+export interface JournalEntry {
+  id: string;
+  date: string;
+  gratitude: string;
+  learned: string;
+  mood: number | null; // 1-10
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Mente — Foco (Pomodoro): una fila por bloque de trabajo completado.
+// ---------------------------------------------------------------------
+
+export interface FocusSession {
+  id: string;
+  durationMinutes: number;
+  completedAt: string;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Recuperación — Screen Time: una fila por día.
+// ---------------------------------------------------------------------
+
+export interface ScreenTimeLog {
+  id: string;
+  date: string;
+  hours: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Vida — Finanzas.
+// ---------------------------------------------------------------------
+
+export interface Expense {
+  id: string;
+  amount: number;
+  category: string | null;
+  date: string;
+  note: string | null;
+  isEssential: boolean;
+  createdAt: string;
+}
+
+export interface FinanceGoals {
+  monthlySavingsGoal: number | null;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Vida — Metas a largo plazo.
+// ---------------------------------------------------------------------
+
+/** A long-term personal goal (Vida). Named `LifeGoal` to avoid colliding with
+ *  the training `Goal` type ("strength" | "hypertrophy" | ...) above. */
+export interface LifeGoal {
+  id: string;
+  name: string;
+  description: string | null;
+  targetDate: string | null; // ISO date (YYYY-MM-DD)
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface GoalCheckpoint {
+  id: string;
+  goalId: string;
+  name: string;
+  done: boolean;
+  position: number;
   createdAt: string;
 }

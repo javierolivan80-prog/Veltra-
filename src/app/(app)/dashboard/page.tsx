@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRightCircle, ChevronRight, Cpu, Dumbbell, History, Play, User, UtensilsCrossed } from "lucide-react";
+import { ArrowRightCircle, Check, ChevronRight, Cpu, Dumbbell, History, Moon, Play, ShieldAlert, SkipForward, User, UtensilsCrossed, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
@@ -9,11 +9,20 @@ import { Card } from "@/design-system/components/Card";
 import { EmptyState } from "@/design-system/components/EmptyState";
 import { SectionHeader } from "@/design-system/components/SectionHeader";
 import { StatNumber } from "@/design-system/components/StatNumber";
+import { useAddictions, useAllRelapses } from "@/features/addictions/hooks";
+import { currentStreakStartMs } from "@/features/addictions/stats";
+import { computeCombinedStreak } from "@/features/dashboard/combinedStreak";
 import { useRecentPRs } from "@/features/exercises/hooks";
+import { useAllHabitLogs, useHabits, useLogHabit, useTodayHabitLogs } from "@/features/habits/hooks";
 import { useRoutines } from "@/features/routines/hooks";
 import { useProfile } from "@/features/profile/hooks";
+import { sleptMinutes } from "@/features/sleep/calc";
+import { useSleepLogByDate, useSleepLogs } from "@/features/sleep/hooks";
 import { useActiveSession, useCurrentStreak, useRecentSessions, useStartSession } from "@/features/workouts/hooks";
+import { formatHoursMinutes } from "@/lib/duration";
+import { todayKey } from "@/lib/date";
 import { formatRelativeTime, formatWeight } from "@/lib/format";
+import type { Habit, HabitLogStatus } from "@/types/models";
 
 function greeting(): string {
   const h = new Date().getHours();
@@ -23,10 +32,33 @@ function greeting(): string {
   return "Buenas noches";
 }
 
+const MOTIVATIONAL_QUOTES = [
+  "La disciplina es elegir entre lo que quieres ahora y lo que quieres más.",
+  "Un pequeño progreso cada día suma un gran resultado.",
+  "No cuentan los días, cuenta lo que haces con ellos.",
+  "El cuerpo logra lo que la mente cree.",
+  "Consistencia, no perfección.",
+  "Hoy es una nueva oportunidad para ser un poco mejor.",
+  "El descanso también es parte del entrenamiento.",
+];
+
+function motivationalQuote(): string {
+  const dayOfYear = Math.floor((Date.now() - new Date(new Date().getFullYear(), 0, 0).getTime()) / 86400000);
+  return MOTIVATIONAL_QUOTES[dayOfYear % MOTIVATIONAL_QUOTES.length];
+}
+
 const PR_LABEL: Record<string, string> = { weight: "peso", "1rm": "1RM est.", volume: "volumen", reps: "reps" };
+
+function isDue(habit: Habit): boolean {
+  if (!habit.notificationTime) return true;
+  const now = new Date();
+  const nowHHMM = `${String(now.getHours()).padStart(2, "0")}:${String(now.getMinutes()).padStart(2, "0")}`;
+  return nowHHMM >= habit.notificationTime;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
+  const today = todayKey();
   const { data: profile } = useProfile();
   const { data: streak = 0 } = useCurrentStreak();
   const { data: routines = [] } = useRoutines();
@@ -34,6 +66,23 @@ export default function DashboardPage() {
   const { data: recentPRs = [] } = useRecentPRs(6);
   const { data: activeSession } = useActiveSession();
   const startSession = useStartSession();
+
+  const { data: lastNight } = useSleepLogByDate(today);
+  const { data: allSleepLogs = [] } = useSleepLogs();
+  const { data: habits = [] } = useHabits();
+  const { data: todayHabitLogs = [] } = useTodayHabitLogs();
+  const { data: allHabitLogs = [] } = useAllHabitLogs();
+  const { data: addictions = [] } = useAddictions();
+  const { data: allRelapses = [] } = useAllRelapses();
+  const logHabit = useLogHabit();
+
+  const answeredIds = useMemo(() => new Set(todayHabitLogs.map((l) => l.habitId)), [todayHabitLogs]);
+  const pendingHabits = useMemo(() => habits.filter((h) => isDue(h) && !answeredIds.has(h.id)), [habits, answeredIds]);
+
+  const generalStreak = useMemo(
+    () => computeCombinedStreak(allHabitLogs, allSleepLogs, allRelapses),
+    [allHabitLogs, allSleepLogs, allRelapses]
+  );
 
   const suggestedRoutine = useMemo(() => {
     if (routines.length === 0) return null;
@@ -68,6 +117,8 @@ export default function DashboardPage() {
     router.push(`/workout/${session.id}`);
   };
 
+  const respondHabit = (habitId: string, status: HabitLogStatus) => logHabit.mutate({ habitId, date: today, status });
+
   const firstName = profile?.fullName?.split(" ")[0] ?? "";
 
   return (
@@ -84,6 +135,78 @@ export default function DashboardPage() {
           <User size={18} className="text-ink-dim" />
         </Link>
       </div>
+
+      <p className="text-ink-dim text-sm italic leading-5 -mt-3">&ldquo;{motivationalQuote()}&rdquo;</p>
+
+      {generalStreak > 0 ? (
+        <Card raised className="bg-record-bg border-record/30">
+          <StatNumber value={generalStreak} unit="días" size="md" color="text-record" label="Racha general — hábitos, sueño y sin caídas" />
+        </Card>
+      ) : null}
+
+      <div className="grid grid-cols-2 gap-3">
+        <Link href="/sleep" className="block">
+          <Card raised className="h-full">
+            <div className="flex items-center gap-2 mb-1.5">
+              <Moon size={14} className="text-sleep" />
+              <p className="text-ink-dim text-xs font-semibold">Anoche</p>
+            </div>
+            <p className="text-ink text-xl font-display">{lastNight ? formatHoursMinutes(sleptMinutes(lastNight)) : "—"}</p>
+            <p className="text-ink-faint text-xs mt-0.5">{lastNight?.quality ? `Calidad ${lastNight.quality}/10` : "Sin registrar"}</p>
+          </Card>
+        </Link>
+        <Link href="/habits" className="block">
+          <Card raised className="h-full">
+            <p className="text-ink-dim text-xs font-semibold mb-1.5">Hábitos hoy</p>
+            <p className="text-ink text-xl font-display">
+              {todayHabitLogs.filter((l) => l.status === "done").length}/{habits.length}
+            </p>
+            <p className="text-ink-faint text-xs mt-0.5">{pendingHabits.length > 0 ? `${pendingHabits.length} pendientes` : "Al día"}</p>
+          </Card>
+        </Link>
+      </div>
+
+      {pendingHabits.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {pendingHabits.map((habit) => (
+            <Card key={habit.id} raised className="bg-progress-bg border-progress/30">
+              <p className="text-ink font-semibold text-sm">¿Hiciste &ldquo;{habit.name}&rdquo; hoy?</p>
+              <div className="flex gap-2 mt-3">
+                <button onClick={() => respondHabit(habit.id, "done")} className="flex-1 flex items-center justify-center gap-1.5 bg-progress rounded-xl py-2 text-bg-deep text-xs font-bold">
+                  <Check size={13} /> Sí
+                </button>
+                <button onClick={() => respondHabit(habit.id, "not_done")} className="flex-1 flex items-center justify-center gap-1.5 bg-surface-raised border border-line-subtle rounded-xl py-2 text-ink text-xs font-bold">
+                  <X size={13} /> No
+                </button>
+                <button onClick={() => respondHabit(habit.id, "skipped")} className="flex-1 flex items-center justify-center gap-1.5 bg-surface-raised border border-line-subtle rounded-xl py-2 text-ink-dim text-xs font-bold">
+                  <SkipForward size={13} /> Saltar
+                </button>
+              </div>
+            </Card>
+          ))}
+        </div>
+      ) : null}
+
+      {addictions.length > 0 ? (
+        <div className="flex gap-3 overflow-x-auto no-scrollbar scroll-fade-x pb-1 pr-2">
+          {addictions.map((addiction) => {
+            const relapses = allRelapses.filter((r) => r.addictionId === addiction.id);
+            const days = Math.floor((Date.now() - currentStreakStartMs(addiction, relapses)) / 86400000);
+            return (
+              <Link key={addiction.id} href={`/addictions/${addiction.id}`} className="shrink-0">
+                <Card raised className="w-40 bg-addiction-bg border-addiction/30">
+                  <div className="flex items-center gap-1.5 mb-1.5">
+                    <ShieldAlert size={13} className="text-addiction" />
+                    <p className="text-ink-dim text-xs font-semibold truncate">{addiction.name}</p>
+                  </div>
+                  <p className="text-ink text-xl font-display">{days}</p>
+                  <p className="text-ink-faint text-xs mt-0.5">días sin caer</p>
+                </Card>
+              </Link>
+            );
+          })}
+        </div>
+      ) : null}
 
       {activeSession ? (
         <Card onClick={() => router.push(`/workout/${activeSession.id}`)} raised className="border-progress/40 bg-progress-bg">
@@ -119,7 +242,7 @@ export default function DashboardPage() {
 
       <div className="grid grid-cols-2 gap-3">
         <Card raised>
-          <StatNumber value={streak} unit="días" size="md" color="text-progress" label="Racha actual" />
+          <StatNumber value={streak} unit="días" size="md" color="text-progress" label="Racha de entreno" />
         </Card>
         <Card raised>
           <StatNumber value={thisWeekCount} unit="/ sem" size="md" color="text-info" label="Sesiones esta semana" />

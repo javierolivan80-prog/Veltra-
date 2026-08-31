@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, Cpu, Home, List, Moon, ShieldAlert, TrendingUp, User, UtensilsCrossed } from "lucide-react";
+import { Heart, Home, Sparkles, ShieldAlert, Target, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
@@ -10,16 +10,26 @@ import { useProfile } from "@/features/profile/hooks";
 import { isOnboarded } from "@/features/profile/repo";
 
 const NAV_ITEMS = [
-  { href: "/dashboard", label: "Inicio", icon: Home, activeColor: "text-progress" },
-  { href: "/routines", label: "Rutinas", icon: List, activeColor: "text-progress" },
-  { href: "/progress", label: "Progreso", icon: TrendingUp, activeColor: "text-progress" },
-  { href: "/habits", label: "Hábitos", icon: CheckCircle2, activeColor: "text-progress" },
-  { href: "/sleep", label: "Sueño", icon: Moon, activeColor: "text-sleep" },
-  { href: "/addictions", label: "Adicciones", icon: ShieldAlert, activeColor: "text-addiction" },
-  { href: "/food", label: "Food", icon: UtensilsCrossed, activeColor: "text-progress" },
-  { href: "/coach", label: "Coach", icon: Cpu, activeColor: "text-ai" },
-  { href: "/profile", label: "Perfil", icon: User, activeColor: "text-progress" },
+  { href: "/dashboard", label: "Hoy", icon: Home, activeColor: "text-ink" },
+  { href: "/body", label: "Cuerpo", icon: Heart, activeColor: "text-info" },
+  { href: "/mind", label: "Mente", icon: Sparkles, activeColor: "text-progress" },
+  { href: "/recovery", label: "Recuperación", icon: ShieldAlert, activeColor: "text-addiction" },
+  { href: "/life", label: "Vida", icon: Target, activeColor: "text-record" },
 ];
+
+/** Module routes that belong to each category tab, so it stays highlighted
+ *  when you're two levels deep (e.g. /sleep highlights "Cuerpo"). */
+const CATEGORY_CHILDREN: Record<string, string[]> = {
+  "/body": ["/routines", "/progress", "/history", "/workout", "/exercises", "/sleep", "/food", "/weight"],
+  "/mind": ["/habits", "/meditation", "/journal", "/focus"],
+  "/recovery": ["/addictions", "/screen-time"],
+  "/life": ["/finances", "/goals"],
+};
+
+function isActive(pathname: string, href: string): boolean {
+  if (pathname === href || pathname.startsWith(`${href}/`)) return true;
+  return (CATEGORY_CHILDREN[href] ?? []).some((child) => pathname === child || pathname.startsWith(`${child}/`));
+}
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -42,9 +52,9 @@ export function AppShell({ children }: { children: ReactNode }) {
         <div className="mb-10 px-2">
           <Logo size="sm" />
         </div>
-        <nav className="flex flex-col gap-1">
+        <nav className="flex flex-col gap-1 flex-1">
           {NAV_ITEMS.map((item) => {
-            const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+            const active = isActive(pathname, item.href);
             const Icon = item.icon;
             return (
               <Link
@@ -61,6 +71,16 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
+        <Link
+          href="/profile"
+          className={cn(
+            "flex items-center gap-3 px-3.5 py-3 rounded-2xl text-sm font-semibold transition-colors",
+            isActive(pathname, "/profile") ? "bg-surface-raised text-ink" : "text-ink-dim hover:text-ink hover:bg-surface"
+          )}
+        >
+          <User size={18} />
+          Perfil
+        </Link>
       </aside>
 
       {/* Main content */}
@@ -71,7 +91,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-4 left-3 right-3 z-50 bg-surface-raised/95 backdrop-blur border border-line-subtle rounded-[26px] shadow-2xl shadow-black/40 px-1 py-2 flex">
         {NAV_ITEMS.map((item) => {
-          const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+          const active = isActive(pathname, item.href);
           const Icon = item.icon;
           return (
             <Link key={item.href} href={item.href} className="flex-1 min-w-0 flex flex-col items-center gap-1 py-1.5 rounded-2xl">

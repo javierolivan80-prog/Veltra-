@@ -4,6 +4,7 @@ import { Plus, ShieldAlert } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/design-system/components/Card";
+import { CategoryBackLink } from "@/design-system/components/CategoryBackLink";
 import { EmptyState } from "@/design-system/components/EmptyState";
 import { LiveDurationCounter } from "@/design-system/components/LiveDurationCounter";
 import { AddictionFormDialog } from "@/features/addictions/AddictionFormDialog";
@@ -49,6 +50,7 @@ export default function AddictionsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <CategoryBackLink href="/recovery" label="Recuperación" />
       <div className="flex items-center justify-between">
         <div>
           <p className="text-ink-dim text-sm">Recuperación</p>

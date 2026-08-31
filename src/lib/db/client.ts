@@ -54,6 +54,18 @@ export function getDb(): Promise<IDBPDatabase<VeltraDB>> {
           db.createObjectStore("addictionRelapses", { keyPath: "id" }).createIndex("addictionId", "addictionId");
           db.createObjectStore("pushSubscriptions", { keyPath: "id" });
         }
+        if (oldVersion < 5) {
+          db.createObjectStore("waterLogs", { keyPath: "id" }).createIndex("date", "date");
+          db.createObjectStore("mealChecks", { keyPath: "id" }).createIndex("date", "date");
+          db.createObjectStore("meditationSessions", { keyPath: "id" }).createIndex("completedAt", "completedAt");
+          db.createObjectStore("journalEntries", { keyPath: "id" }).createIndex("date", "date");
+          db.createObjectStore("focusSessions", { keyPath: "id" }).createIndex("completedAt", "completedAt");
+          db.createObjectStore("screenTimeLogs", { keyPath: "id" }).createIndex("date", "date");
+          db.createObjectStore("expenses", { keyPath: "id" }).createIndex("date", "date");
+          db.createObjectStore("financeGoals", { keyPath: "id" });
+          db.createObjectStore("goals", { keyPath: "id" });
+          db.createObjectStore("goalCheckpoints", { keyPath: "id" }).createIndex("goalId", "goalId");
+        }
       },
     }).then(async (db) => {
       await seedExerciseLibrary(db);

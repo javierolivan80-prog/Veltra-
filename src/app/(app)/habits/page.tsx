@@ -4,6 +4,7 @@ import { Bell, Check, Flame, Plus, SkipForward, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/design-system/components/Card";
+import { CategoryBackLink } from "@/design-system/components/CategoryBackLink";
 import { EmptyState } from "@/design-system/components/EmptyState";
 import { SectionHeader } from "@/design-system/components/SectionHeader";
 import { HabitFormDialog } from "@/features/habits/HabitFormDialog";
@@ -119,9 +120,10 @@ export default function HabitsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <CategoryBackLink href="/mind" label="Mente" />
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-ink-dim text-sm">Salud mental</p>
+          <p className="text-ink-dim text-sm">Mente</p>
           <h1 className="text-ink text-2xl font-display mt-0.5">Hábitos</h1>
         </div>
         <button

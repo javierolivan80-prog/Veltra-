@@ -78,6 +78,7 @@ export async function seedDemoData(db: IDBPDatabase<VeltraDB>) {
     trainingDaysPerWeek: 3,
     equipmentAvailable: ["barbell", "dumbbell", "machine", "cable", "bodyweight", "kettlebell"],
     onboardingCompleted: true,
+    targetWeightKg: null,
     createdAt: nowIso,
     updatedAt: nowIso,
   });

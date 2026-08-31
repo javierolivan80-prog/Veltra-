@@ -95,6 +95,19 @@ export async function deleteAddiction(id: string): Promise<void> {
 
 // --- Relapses ---
 
+/** Every relapse the user has, across all addictions — used for the combined
+ *  "Hoy" streak. */
+export async function listAllRelapses(): Promise<AddictionRelapse[]> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data, error } = await supabase.from("addiction_relapses").select("*").order("fallen_at", { ascending: true });
+    if (error) return [];
+    return (data ?? []).map((r: any) => toCamelCase<AddictionRelapse>(r));
+  }
+  const db = await getDb();
+  return db.getAll("addictionRelapses");
+}
+
 export async function listRelapses(addictionId: string): Promise<AddictionRelapse[]> {
   if (isSupabaseConfigured) {
     const supabase = getSupabaseBrowserClient()!;

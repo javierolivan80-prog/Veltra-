@@ -67,6 +67,40 @@ function beep(startAt: number, frequency: number, duration: number): void {
   osc.stop(startAt + duration + 0.02);
 }
 
+/** A single bell-like tone — used by Meditación (start/fin) and Foco (fin de bloque). */
+export function playBell(): void {
+  if (typeof window === "undefined" || isAlertMuted()) return;
+  try {
+    if (ctx && ctx.state === "running") beep(ctx.currentTime, 800, 0.7);
+  } catch {
+    // never let an audio failure break the timer
+  }
+}
+
+/** Bell + vibration + notification, where each is available — used when a
+ *  Meditación session or a Foco block finishes unattended. */
+export function playFinishedAlert(title: string, body: string): void {
+  if (typeof window === "undefined" || isAlertMuted()) return;
+
+  try {
+    if (ctx && ctx.state === "running") beep(ctx.currentTime, 800, 0.7);
+  } catch {
+    // never let an audio failure break the timer
+  }
+  try {
+    navigator.vibrate?.([200, 100, 200]);
+  } catch {
+    // unsupported (notably iOS Safari)
+  }
+  try {
+    if ("Notification" in window && Notification.permission === "granted") {
+      new Notification(title, { body, icon: "/icon.svg", tag: "veltra-timer" });
+    }
+  } catch {
+    // never let a notification failure break the timer
+  }
+}
+
 /** Three rising beeps + a vibration pattern, where each is available. */
 export function playRestFinishedAlert(): void {
   if (typeof window === "undefined" || isAlertMuted()) return;

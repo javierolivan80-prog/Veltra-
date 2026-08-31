@@ -6,12 +6,20 @@ import type {
   CoachMessage,
   Conversation,
   Exercise,
+  Expense,
+  FinanceGoals,
+  FocusSession,
   FoodConversation,
   FoodMeal,
   FoodMessage,
+  GoalCheckpoint,
   Habit,
   HabitLog,
   Injury,
+  JournalEntry,
+  LifeGoal,
+  MealCheck,
+  MeditationSession,
   MemoryFact,
   NutritionGoals,
   SavedMeal,
@@ -20,16 +28,21 @@ import type {
   PushSubscriptionRow,
   Routine,
   RoutineExercise,
+  ScreenTimeLog,
   SetEntry,
   SleepLog,
+  WaterLog,
   WorkoutSession,
 } from "@/types/models";
 
 export const DB_NAME = "veltra";
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 
 /** Single-row store for the local nutrition goals — mirrors the per-user Supabase row. */
 export type StoredNutritionGoals = NutritionGoals & { id: string };
+
+/** Single-row store for the local finance goals — mirrors the per-user Supabase row. */
+export type StoredFinanceGoals = FinanceGoals & { id: string };
 
 /** The routines store holds the routine row only — its exercises live in the separate routineExercises store, same as the Postgres schema. */
 export type StoredRoutine = Omit<Routine, "exercises">;
@@ -65,6 +78,16 @@ export interface VeltraDB extends DBSchema {
   addictions: { key: string; value: Addiction };
   addictionRelapses: { key: string; value: AddictionRelapse; indexes: { addictionId: string } };
   pushSubscriptions: { key: string; value: PushSubscriptionRow };
+  waterLogs: { key: string; value: WaterLog; indexes: { date: string } };
+  mealChecks: { key: string; value: MealCheck; indexes: { date: string } };
+  meditationSessions: { key: string; value: MeditationSession; indexes: { completedAt: string } };
+  journalEntries: { key: string; value: JournalEntry; indexes: { date: string } };
+  focusSessions: { key: string; value: FocusSession; indexes: { completedAt: string } };
+  screenTimeLogs: { key: string; value: ScreenTimeLog; indexes: { date: string } };
+  expenses: { key: string; value: Expense; indexes: { date: string } };
+  financeGoals: { key: string; value: StoredFinanceGoals };
+  goals: { key: string; value: LifeGoal };
+  goalCheckpoints: { key: string; value: GoalCheckpoint; indexes: { goalId: string } };
 }
 
 export const STORE_NAMES = [
@@ -91,4 +114,14 @@ export const STORE_NAMES = [
   "addictions",
   "addictionRelapses",
   "pushSubscriptions",
+  "waterLogs",
+  "mealChecks",
+  "meditationSessions",
+  "journalEntries",
+  "focusSessions",
+  "screenTimeLogs",
+  "expenses",
+  "financeGoals",
+  "goals",
+  "goalCheckpoints",
 ] as const;

@@ -93,11 +93,24 @@ export async function upsertProfile(input: ProfileInput): Promise<Profile> {
     trainingDaysPerWeek: input.trainingDaysPerWeek,
     equipmentAvailable: input.equipmentAvailable,
     onboardingCompleted: true,
+    targetWeightKg: existing?.targetWeightKg ?? null,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
   await db.put("profile", profile);
   return profile;
+}
+
+export async function updateTargetWeight(kg: number | null): Promise<void> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const userId = await requireUserId();
+    await supabase.from("profile").update({ target_weight_kg: kg, updated_at: new Date().toISOString() }).eq("id", userId);
+    return;
+  }
+  const db = await getDb();
+  const existing = await db.get("profile", LOCAL_PROFILE_ID);
+  if (existing) await db.put("profile", { ...existing, targetWeightKg: kg, updatedAt: new Date().toISOString() });
 }
 
 export async function updateBodyweight(kg: number): Promise<void> {

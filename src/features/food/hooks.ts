@@ -2,8 +2,9 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { sendFoodMessage, type SendFoodMessageInput } from "@/lib/ai/foodClient";
-import type { SavedMeal } from "@/types/models";
+import type { MealCheckStatus, SavedMeal } from "@/types/models";
 import * as repo from "./repo";
+import * as waterRepo from "./water";
 
 export const foodKeys = {
   conversations: ["foodConversations"] as const,
@@ -14,7 +15,33 @@ export const foodKeys = {
   daily: (date: string) => ["foodDaily", date] as const,
   goals: ["nutritionGoals"] as const,
   saved: ["savedMeals"] as const,
+  water: (date: string) => ["water", date] as const,
+  mealCheck: (date: string) => ["mealCheck", date] as const,
 };
+
+export function useWaterLog(date: string) {
+  return useQuery({ queryKey: foodKeys.water(date), queryFn: () => waterRepo.getWaterLog(date) });
+}
+
+export function useAddWater() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ date, delta }: { date: string; delta: number }) => waterRepo.addWater(date, delta),
+    onSuccess: (_data, variables) => qc.invalidateQueries({ queryKey: foodKeys.water(variables.date) }),
+  });
+}
+
+export function useMealCheck(date: string) {
+  return useQuery({ queryKey: foodKeys.mealCheck(date), queryFn: () => waterRepo.getMealCheck(date) });
+}
+
+export function useSetMealCheck() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ date, status }: { date: string; status: MealCheckStatus }) => waterRepo.setMealCheck(date, status),
+    onSuccess: (_data, variables) => qc.invalidateQueries({ queryKey: foodKeys.mealCheck(variables.date) }),
+  });
+}
 
 export function useFoodConversations() {
   return useQuery({ queryKey: foodKeys.conversations, queryFn: repo.listFoodConversations });

@@ -107,6 +107,19 @@ export async function listHabitLogs(habitId: string): Promise<HabitLog[]> {
   return logs.sort((a, b) => a.date.localeCompare(b.date));
 }
 
+/** Every habit log the user has, across all habits — used for the combined
+ *  "Hoy" streak, which needs to check "was anything marked not_done today". */
+export async function listAllHabitLogs(): Promise<HabitLog[]> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data, error } = await supabase.from("habit_logs").select("*").order("date", { ascending: true });
+    if (error) return [];
+    return (data ?? []).map((r: any) => toCamelCase<HabitLog>(r));
+  }
+  const db = await getDb();
+  return db.getAll("habitLogs");
+}
+
 /** All habits' logs for a single day — used to render "pendientes hoy". */
 export async function listHabitLogsForDate(date: string): Promise<HabitLog[]> {
   if (isSupabaseConfigured) {

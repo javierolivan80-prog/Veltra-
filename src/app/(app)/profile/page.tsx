@@ -1,6 +1,7 @@
 "use client";
 
-import { Trash2 } from "lucide-react";
+import { ChevronRight, Scale, Trash2 } from "lucide-react";
+import Link from "next/link";
 import { useState } from "react";
 import { Badge } from "@/design-system/components/Badge";
 import { Button } from "@/design-system/components/Button";
@@ -8,12 +9,10 @@ import { Card } from "@/design-system/components/Card";
 import { SectionHeader } from "@/design-system/components/SectionHeader";
 import { StatNumber } from "@/design-system/components/StatNumber";
 import { TextField } from "@/design-system/components/TextField";
-import { LineChart } from "@/design-system/charts/LineChart";
 import { EditProfileDialog } from "@/features/profile/EditProfileDialog";
-import { useAddBodyWeightLog, useAddInjury, useBodyWeightLogs, useDeleteInjury, useInjuries, useProfile, useToggleInjury } from "@/features/profile/hooks";
+import { useAddInjury, useDeleteInjury, useInjuries, useProfile, useToggleInjury } from "@/features/profile/hooks";
 import { useCurrentStreak, useRecentSessions } from "@/features/workouts/hooks";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { formatDateLong } from "@/lib/format";
 import { useAuthStore } from "@/state/auth.store";
 
 const EXPERIENCE_LABEL: Record<string, string> = { beginner: "Principiante", intermediate: "Intermedio", advanced: "Avanzado", elite: "Elite" };
@@ -25,19 +24,15 @@ export default function ProfilePage() {
   const { data: streak = 0 } = useCurrentStreak();
   const { data: sessions = [] } = useRecentSessions(200);
   const { data: injuries = [] } = useInjuries();
-  const { data: weightLogs = [] } = useBodyWeightLogs();
   const addInjury = useAddInjury();
   const toggleInjury = useToggleInjury();
   const deleteInjury = useDeleteInjury();
-  const addWeightLog = useAddBodyWeightLog();
   const { user, signOut } = useAuthStore();
 
   const [editOpen, setEditOpen] = useState(false);
   const [showInjuryForm, setShowInjuryForm] = useState(false);
   const [injuryArea, setInjuryArea] = useState("");
   const [injuryNote, setInjuryNote] = useState("");
-  const [showWeightForm, setShowWeightForm] = useState(false);
-  const [weightInput, setWeightInput] = useState("");
 
   if (!profile) return null;
 
@@ -85,35 +80,21 @@ export default function ProfilePage() {
         </Card>
       </div>
 
-      <div>
-        <SectionHeader title="Peso corporal" action={showWeightForm ? undefined : "Registrar"} onAction={() => setShowWeightForm(true)} />
-        <Card raised>
-          {weightLogs.length > 0 ? (
-            <LineChart data={weightLogs.map((l) => ({ x: l.date, y: l.weightKg }))} color="#4DA3FF" height={140} formatX={(x) => formatDateLong(x).split(" de ")[0]} />
-          ) : (
-            <p className="text-ink-dim text-sm">Registra tu peso para ver la evolución aquí.</p>
-          )}
-          {showWeightForm ? (
-            <div className="flex items-end gap-3 mt-4">
-              <div className="flex-1">
-                <TextField label="Peso" placeholder="75.5" inputMode="decimal" suffix="kg" value={weightInput} onChange={(e) => setWeightInput(e.target.value)} />
-              </div>
-              <Button
-                label="Guardar"
-                size="md"
-                onClick={async () => {
-                  const kg = Number(weightInput);
-                  if (kg > 0) {
-                    await addWeightLog.mutateAsync(kg);
-                    setWeightInput("");
-                    setShowWeightForm(false);
-                  }
-                }}
-              />
-            </div>
-          ) : null}
-        </Card>
-      </div>
+      <Link
+        href="/weight"
+        className="flex items-center justify-between rounded-2xl border border-line-subtle bg-surface-raised px-5 py-4 hover:border-line transition-colors"
+      >
+        <div className="flex items-center gap-3">
+          <span className="w-9 h-9 rounded-full bg-info-bg flex items-center justify-center shrink-0">
+            <Scale size={17} className="text-info" />
+          </span>
+          <div>
+            <p className="text-ink text-sm font-semibold">Peso corporal</p>
+            <p className="text-ink-dim text-xs mt-0.5">{profile.bodyweightKg ? `${profile.bodyweightKg}kg actual` : "Registra tu peso"}</p>
+          </div>
+        </div>
+        <ChevronRight size={18} className="text-ink-faint shrink-0" />
+      </Link>
 
       <div>
         <SectionHeader title="Lesiones" action={showInjuryForm ? undefined : "Añadir"} onAction={() => setShowInjuryForm(true)} />

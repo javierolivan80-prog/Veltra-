@@ -30,6 +30,10 @@ export function useTodayHabitLogs() {
   return useQuery({ queryKey: habitKeys.today(), queryFn: () => repo.listHabitLogsForDate(todayKey()) });
 }
 
+export function useAllHabitLogs() {
+  return useQuery({ queryKey: [...habitKeys.all, "allLogs"] as const, queryFn: repo.listAllHabitLogs });
+}
+
 export function useCreateHabit() {
   const qc = useQueryClient();
   return useMutation({

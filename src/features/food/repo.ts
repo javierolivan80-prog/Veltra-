@@ -175,6 +175,20 @@ export async function listMealsForConversation(conversationId: string): Promise<
   return all.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
 }
 
+/** Every meal the user has logged, across all days — used to average kcal
+ *  over a rolling window on the "Cuerpo" progress overview. */
+export async function listAllFoodMeals(): Promise<FoodMeal[]> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data, error } = await supabase.from("food_meals").select("*").order("date", { ascending: true });
+    if (error || !data) return [];
+    return data.map((r: any) => toCamelCase<FoodMeal>(r));
+  }
+  const db = await getDb();
+  const all = await db.getAll("foodMeals");
+  return all.sort((a, b) => a.date.localeCompare(b.date));
+}
+
 export async function listMealsForDate(date: string): Promise<FoodMeal[]> {
   if (isSupabaseConfigured) {
     const supabase = getSupabaseBrowserClient()!;

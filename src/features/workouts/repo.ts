@@ -229,6 +229,20 @@ export async function listRecentSessions(limit = 10): Promise<WorkoutSession[]> 
   return all.sort((a, b) => b.startedAt.localeCompare(a.startedAt)).slice(0, limit);
 }
 
+/** Every non-warmup set the user has logged, across all exercises — used for
+ *  the "Cuerpo" progress overview (rank + trend per exercise). */
+export async function listAllSets(): Promise<SetEntry[]> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const { data, error } = await supabase.from("set_entries").select("*").eq("is_warmup", false).order("completed_at", { ascending: true });
+    if (error || !data) return [];
+    return data.map((r: any) => toCamelCase<SetEntry>(r));
+  }
+  const db = await getDb();
+  const all = await db.getAll("setEntries");
+  return all.filter((s) => !s.isWarmup).sort((a, b) => a.completedAt.localeCompare(b.completedAt));
+}
+
 export async function getExerciseIdsInSession(sessionId: string): Promise<string[]> {
   const sets = await getSessionSets(sessionId);
   return [...new Set(sets.map((s) => s.exerciseId))];

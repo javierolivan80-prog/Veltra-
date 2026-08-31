@@ -48,6 +48,10 @@ export function useCurrentStreak() {
   return useQuery({ queryKey: workoutKeys.streak(), queryFn: repo.currentStreakDays });
 }
 
+export function useAllSets() {
+  return useQuery({ queryKey: [...workoutKeys.all, "allSets"] as const, queryFn: repo.listAllSets });
+}
+
 export function useStartSession() {
   const qc = useQueryClient();
   return useMutation({

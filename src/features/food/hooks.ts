@@ -19,6 +19,10 @@ export const foodKeys = {
   mealCheck: (date: string) => ["mealCheck", date] as const,
 };
 
+export function useAllFoodMeals() {
+  return useQuery({ queryKey: ["allFoodMeals"] as const, queryFn: repo.listAllFoodMeals });
+}
+
 export function useWaterLog(date: string) {
   return useQuery({ queryKey: foodKeys.water(date), queryFn: () => waterRepo.getWaterLog(date) });
 }

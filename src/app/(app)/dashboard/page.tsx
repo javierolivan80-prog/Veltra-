@@ -1,6 +1,6 @@
 "use client";
 
-import { Brain, Dumbbell, Flame, Moon, ShieldCheck, Target, UtensilsCrossed, Scale, Check } from "lucide-react";
+import { Book, Brain, Dumbbell, Flame, Moon, Play, ShieldCheck, Target, UtensilsCrossed, Scale, Check, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -40,6 +40,31 @@ type PendingItem = {
   icon: typeof Dumbbell;
   colorClass: string;
 } & ({ kind: "toggle"; onToggle: () => void } | { kind: "link"; href: string } | { kind: "action"; onAction: () => void });
+
+interface TimelineEvent {
+  id: string;
+  timeLabel: string;
+  minutes: number;
+  kicker: string;
+  title: string;
+  meta: string;
+  icon: LucideIcon;
+  colorClass: string;
+  now?: boolean;
+  cta?: { label: string; onClick: () => void };
+}
+
+function timeLabelOf(iso: string): { label: string; minutes: number } {
+  const d = new Date(iso);
+  const h = d.getHours();
+  const m = d.getMinutes();
+  return { label: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`, minutes: h * 60 + m };
+}
+
+function minutesOfHHMM(hhmm: string): number {
+  const [h, m] = hhmm.split(":").map(Number);
+  return h * 60 + m;
+}
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -84,12 +109,15 @@ export default function DashboardPage() {
     return recentSessions.filter((s) => new Date(s.startedAt).getTime() >= weekAgo).length;
   }, [recentSessions, nowMs]);
 
-  const workoutDoneToday = useMemo(
-    () => recentSessions.some((s) => s.status === "completed" && s.startedAt.slice(0, 10) === today),
+  const completedSessionToday = useMemo(
+    () => recentSessions.find((s) => s.status === "completed" && s.startedAt.slice(0, 10) === today) ?? null,
     [recentSessions, today]
   );
-  const meditatedToday = useMemo(() => meditationSessions.some((s) => s.completedAt.slice(0, 10) === today), [meditationSessions, today]);
-  const focusedToday = useMemo(() => focusSessions.some((s) => s.completedAt.slice(0, 10) === today), [focusSessions, today]);
+  const workoutDoneToday = completedSessionToday !== null;
+  const meditatedTodaySessions = useMemo(() => meditationSessions.filter((s) => s.completedAt.slice(0, 10) === today), [meditationSessions, today]);
+  const focusedTodaySessions = useMemo(() => focusSessions.filter((s) => s.completedAt.slice(0, 10) === today), [focusSessions, today]);
+  const meditatedToday = meditatedTodaySessions.length > 0;
+  const focusedToday = focusedTodaySessions.length > 0;
 
   const generalStreak = useMemo(() => computeCombinedStreak(allHabitLogs, allSleepLogs, allRelapses), [allHabitLogs, allSleepLogs, allRelapses]);
 
@@ -135,10 +163,10 @@ export default function DashboardPage() {
 
   const pending: PendingItem[] = useMemo(() => {
     const items: PendingItem[] = [];
-    if (!workoutDoneToday) {
+    if (!workoutDoneToday && !activeSession) {
       items.push({
         id: "workout",
-        title: activeSession ? activeSession.routineName ?? "Sesión libre" : (suggestedRoutine?.name ?? "Entrenamiento"),
+        title: suggestedRoutine?.name ?? "Entrenamiento",
         meta: `Cuerpo · ${suggestedRoutine ? `${suggestedRoutine.exercises.length} ejercicios` : "elige tu rutina"}`,
         icon: Dumbbell,
         colorClass: "text-progress",
@@ -174,6 +202,74 @@ export default function DashboardPage() {
     return items;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workoutDoneToday, activeSession, suggestedRoutine, pendingHabits, focusedToday, isEvening, remainingKcal, logHabit, today]);
+
+  const activeRoutine = useMemo(
+    () => (activeSession?.routineId ? routines.find((r) => r.id === activeSession.routineId) ?? null : null),
+    [activeSession, routines]
+  );
+
+  const timeline = useMemo(() => {
+    const events: TimelineEvent[] = [];
+
+    if (lastNight) {
+      const m = minutesOfHHMM(lastNight.riseTime);
+      events.push({
+        id: "sleep",
+        timeLabel: lastNight.riseTime,
+        minutes: m,
+        kicker: "Recuperación",
+        title: `Sueño ${formatHoursMinutes(sleptMinutes(lastNight))}`,
+        meta: lastNight.quality ? `Calidad ${lastNight.quality}/10` : "Sin calidad registrada",
+        icon: Moon,
+        colorClass: "text-sleep",
+      });
+    }
+
+    meditatedTodaySessions.forEach((s) => {
+      const { label, minutes } = timeLabelOf(s.completedAt);
+      events.push({ id: `med-${s.id}`, timeLabel: label, minutes, kicker: "Mente", title: `Meditación ${s.durationMinutes} min`, meta: "Sesión completada", icon: Brain, colorClass: "text-ai" });
+    });
+
+    if (todayJournal) {
+      const { label, minutes } = timeLabelOf(todayJournal.createdAt);
+      events.push({ id: "journal", timeLabel: label, minutes, kicker: "Mente", title: "Journaling", meta: "Entrada de hoy", icon: Book, colorClass: "text-ai" });
+    }
+
+    focusedTodaySessions.forEach((s) => {
+      const { label, minutes } = timeLabelOf(s.completedAt);
+      events.push({ id: `focus-${s.id}`, timeLabel: label, minutes, kicker: "Mente", title: `Foco ${s.durationMinutes} min`, meta: "Bloque completado", icon: Target, colorClass: "text-ai" });
+    });
+
+    if (activeSession) {
+      const { label, minutes } = timeLabelOf(activeSession.startedAt);
+      events.push({
+        id: "workout-now",
+        timeLabel: label,
+        minutes,
+        kicker: "Ahora",
+        title: activeSession.routineName ?? "Sesión libre",
+        meta: activeRoutine ? `${activeRoutine.exercises.length} ejercicios` : "Entrenamiento libre",
+        icon: Dumbbell,
+        colorClass: "text-progress",
+        now: true,
+        cta: { label: "Continuar entrenamiento", onClick: () => router.push(`/workout/${activeSession.id}`) },
+      });
+    } else if (completedSessionToday) {
+      const { label, minutes } = timeLabelOf(completedSessionToday.startedAt);
+      events.push({
+        id: "workout-done",
+        timeLabel: label,
+        minutes,
+        kicker: "Cuerpo",
+        title: completedSessionToday.routineName ?? "Entrenamiento",
+        meta: "Completado",
+        icon: Dumbbell,
+        colorClass: "text-progress",
+      });
+    }
+
+    return events.sort((a, b) => a.minutes - b.minutes);
+  }, [lastNight, meditatedTodaySessions, todayJournal, focusedTodaySessions, activeSession, activeRoutine, completedSessionToday, router]);
 
   const rings = [
     { id: "cuerpo", label: "Cuerpo", value: cuerpoProgress, color: "#2CE6A0", icon: Dumbbell, href: "/body" },
@@ -294,6 +390,59 @@ export default function DashboardPage() {
               if (item.kind === "action") return <button key={item.id} onClick={item.onAction} className={rowClass}>{row}</button>;
               return <Link key={item.id} href={item.href} className={rowClass}>{row}</Link>;
             })}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em] mb-3">Tu día</p>
+        {timeline.length === 0 ? (
+          <p className="text-ink-dim text-sm">Aún no hay actividad registrada hoy.</p>
+        ) : (
+          <div className="relative pl-6">
+            <span className="absolute left-[5px] top-1.5 bottom-1.5 w-px bg-gradient-to-b from-transparent via-line to-transparent" />
+            <div className="flex flex-col gap-5">
+              {timeline.map((ev) => {
+                const Icon = ev.icon;
+                return (
+                  <div key={ev.id} className="relative">
+                    <span
+                      className={cn(
+                        "absolute -left-6 top-1.5 w-[11px] h-[11px] rounded-full border",
+                        ev.now ? "bg-progress border-progress shadow-[0_0_0_4px_rgba(44,230,160,.14)]" : "bg-bg border-line"
+                      )}
+                    />
+                    <div className="flex items-baseline gap-2">
+                      <span className={cn("font-display text-[13px] font-semibold tracking-wide", ev.now ? "text-progress" : "text-ink-faint")}>{ev.timeLabel}</span>
+                      <span className={cn("text-[10px] font-bold uppercase tracking-[.14em]", ev.now ? "text-progress" : "text-line")}>{ev.kicker}</span>
+                    </div>
+                    <div
+                      className={cn(
+                        "mt-2.5 rounded-[14px] p-4",
+                        ev.now ? "border border-progress/25 bg-gradient-to-b from-[#121614] to-[#0E0F0E]" : "border border-line-subtle bg-[#0E0E0E]"
+                      )}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Icon size={ev.now ? 20 : 16} className={ev.colorClass} />
+                        <div className="flex-1 min-w-0">
+                          <p className={cn("font-display font-semibold truncate", ev.now ? "text-ink text-[20px]" : "text-ink text-[15px]")}>{ev.title}</p>
+                          <p className="text-ink-faint text-xs mt-0.5 truncate">{ev.meta}</p>
+                        </div>
+                      </div>
+                      {ev.cta ? (
+                        <button
+                          onClick={ev.cta.onClick}
+                          className="w-full flex items-center justify-center gap-2 mt-3.5 border border-progress text-progress font-semibold text-sm py-3 rounded-xl hover:bg-progress/10 transition-colors"
+                        >
+                          <Play size={13} fill="currentColor" />
+                          {ev.cta.label}
+                        </button>
+                      ) : null}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
       </div>

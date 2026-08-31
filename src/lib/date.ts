@@ -51,3 +51,13 @@ export function isoWeekNumber(date: Date = new Date()): number {
 export function todayKicker(date: Date = new Date()): string {
   return `${WEEKDAY_NAMES_ES[date.getDay()]} ${date.getDate()} · Semana ${isoWeekNumber(date)}`;
 }
+
+const MONTH_NAMES_ES = [
+  "enero", "febrero", "marzo", "abril", "mayo", "junio",
+  "julio", "agosto", "septiembre", "octubre", "noviembre", "diciembre",
+];
+
+/** "Lunes 31 de agosto" — the subtitle under the "Hoy" title. */
+export function todayFullLabel(date: Date = new Date()): string {
+  return `${WEEKDAY_NAMES_ES[date.getDay()]} ${date.getDate()} de ${MONTH_NAMES_ES[date.getMonth()]}`;
+}

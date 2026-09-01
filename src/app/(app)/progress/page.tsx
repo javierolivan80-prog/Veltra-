@@ -27,7 +27,6 @@ import type { Exercise, SetEntry } from "@/types/models";
 const METRIC_COLOR: Record<ProgressMetric, string> = {
   weight: "#2ce6a0",
   reps: "#a374ff",
-  volume: "#4da3ff",
   "1rm": "#ffc94d",
 };
 
@@ -93,7 +92,6 @@ export default function ProgressPage() {
 
   const aggregate = useMemo(() => {
     const setsInWindow = allSets.filter((s) => new Date(s.completedAt).getTime() >= windowCutoff);
-    const volume = setsInWindow.reduce((sum, s) => sum + s.weightKg * s.reps, 0);
     const sessionCount = new Set(setsInWindow.map((s) => s.sessionId)).size;
 
     const mealsInWindow = allMeals.filter((m) => new Date(m.date).getTime() >= windowCutoff);
@@ -113,7 +111,7 @@ export default function ProgressPage() {
     const weightInWindow = weightLogs.filter((l) => new Date(l.date).getTime() >= windowCutoff);
     const weightDelta = weightInWindow.length >= 2 ? Math.round((weightInWindow[weightInWindow.length - 1].weightKg - weightInWindow[0].weightKg) * 10) / 10 : null;
 
-    return { volume, sessionCount, avgKcal, avgSleepMin, sleepDeltaMin, weightDelta };
+    return { sessionCount, avgKcal, avgSleepMin, sleepDeltaMin, weightDelta };
   }, [allSets, allMeals, allSleepLogs, weightLogs, windowCutoff, windowDays]);
 
   const exerciseRows: ExerciseRow[] = useMemo(() => {
@@ -171,11 +169,9 @@ export default function ProgressPage() {
 
       <div className="grid grid-cols-2 gap-2">
         <div className="border border-line-subtle rounded-lg bg-[#0E0E0E] px-3.5 py-3">
-          <span className="text-ink-faint text-[10.5px] font-bold uppercase tracking-wide">Volumen</span>
-          <p className="text-progress font-display font-semibold text-[22px] mt-1.5">
-            {Math.round(aggregate.volume).toLocaleString("es-ES")} <span className="text-ink-faint text-xs font-medium">kg</span>
-          </p>
-          <p className="text-ink-faint text-[11px] mt-1">{aggregate.sessionCount} sesiones</p>
+          <span className="text-ink-faint text-[10.5px] font-bold uppercase tracking-wide">Sesiones</span>
+          <p className="text-progress font-display font-semibold text-[22px] mt-1.5">{aggregate.sessionCount}</p>
+          <p className="text-ink-faint text-[11px] mt-1">entrenamientos</p>
         </div>
         <div className="border border-line-subtle rounded-lg bg-[#0E0E0E] px-3.5 py-3">
           <span className="text-ink-faint text-[10.5px] font-bold uppercase tracking-wide">Sueño medio</span>
@@ -272,7 +268,6 @@ export default function ProgressPage() {
           options={[
             { value: "weight", label: "Peso" },
             { value: "reps", label: "Reps" },
-            { value: "volume", label: "Volumen" },
             { value: "1rm", label: "1RM" },
           ]}
         />

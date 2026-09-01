@@ -17,18 +17,17 @@ import { ExerciseFormDialog } from "@/features/exercises/ExerciseFormDialog";
 import { useExercise, usePersonalRecords, useToggleFavorite } from "@/features/exercises/hooks";
 import { explainExerciseProgress, monthComparison } from "@/features/exercises/insights";
 import { RANK_META, computeRank, isRankEligible } from "@/features/exercises/ranks";
-import { bestSession, linearPrediction, oneRmSeries, repsSeries, totalTrainingMinutes, volumeSeries, weeklyFrequency, weightSeries } from "@/features/exercises/stats";
+import { linearPrediction, oneRmSeries, repsSeries, totalTrainingMinutes, weeklyFrequency, weightSeries } from "@/features/exercises/stats";
 import { useProfile } from "@/features/profile/hooks";
 import { useSetsForExercise } from "@/features/workouts/hooks";
-import { formatDateLong, formatVolume, formatWeight } from "@/lib/format";
+import { formatDateLong, formatWeight } from "@/lib/format";
 import type { PersonalRecord } from "@/types/models";
 
-type MetricTab = "weight" | "volume" | "1rm" | "reps";
+type MetricTab = "weight" | "1rm" | "reps";
 
 const PR_META: Record<PersonalRecord["type"], { label: string; unit: string; emoji: string }> = {
   weight: { label: "Peso máximo", unit: "kg", emoji: "🏋️" },
   "1rm": { label: "1RM estimado", unit: "kg", emoji: "🥇" },
-  volume: { label: "Volumen (sesión)", unit: "kg", emoji: "📈" },
   reps: { label: "Repeticiones", unit: "reps", emoji: "🔁" },
 };
 
@@ -54,8 +53,6 @@ export default function ExerciseProfilePage() {
     switch (tab) {
       case "weight":
         return weightSeries(sets);
-      case "volume":
-        return volumeSeries(sets, exercise, bw);
       case "1rm":
         return oneRmSeries(sets, exercise, bw);
       case "reps":
@@ -97,7 +94,6 @@ export default function ExerciseProfilePage() {
 
   if (!exercise) return null;
 
-  const best = bestSession(sets, exercise, profile?.bodyweightKg ?? null);
   const comparison = monthComparison(sets, exercise);
   const explanation = explainExerciseProgress(exercise, sets);
 
@@ -161,7 +157,6 @@ export default function ExerciseProfilePage() {
           onChange={setTab}
           options={[
             { value: "weight", label: "Peso" },
-            { value: "volume", label: "Volumen" },
             { value: "1rm", label: "1RM" },
             { value: "reps", label: "Reps" },
           ]}
@@ -178,7 +173,7 @@ export default function ExerciseProfilePage() {
           </div>
           <LineChart
             data={chartData.map((p) => ({ x: p.date, y: p.value }))}
-            color={tab === "1rm" ? "#FFC94D" : tab === "volume" ? "#4DA3FF" : "#2CE6A0"}
+            color={tab === "1rm" ? "#FFC94D" : "#2CE6A0"}
             formatX={(x) => formatDateLong(x).split(" de ")[0]}
             predictedY={tab === "weight" || tab === "1rm" ? (prediction ?? undefined) : undefined}
           />
@@ -209,14 +204,6 @@ export default function ExerciseProfilePage() {
         </Card>
       </div>
 
-      {best ? (
-        <Card raised>
-          <p className="text-ink-dim text-xs font-semibold uppercase tracking-wider mb-1">Mejor sesión histórica</p>
-          <p className="text-ink text-xl font-display">{formatVolume(best.value)} de volumen</p>
-          <p className="text-ink-faint text-xs mt-1">{formatDateLong(best.date)}</p>
-        </Card>
-      ) : null}
-
       {comparison.deltaPct !== null ? (
         <Card raised>
           <p className="text-ink-dim text-xs font-semibold uppercase tracking-wider mb-1">Comparativa mensual</p>
@@ -233,7 +220,7 @@ export default function ExerciseProfilePage() {
       <div>
         <SectionHeader title="Récords personales" />
         <div className="grid grid-cols-2 gap-3">
-          {(["weight", "1rm", "volume", "reps"] as const).map((type) => {
+          {(["weight", "1rm", "reps"] as const).map((type) => {
             const pr = prs.find((p) => p.type === type);
             const meta = PR_META[type];
             return (

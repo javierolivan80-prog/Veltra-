@@ -5,14 +5,12 @@ import { CelebrationOverlay } from "./CelebrationOverlay";
 const TYPE_LABEL: Record<PersonalRecord["type"], string> = {
   weight: "Nuevo récord de peso",
   "1rm": "Nuevo récord de 1RM estimado",
-  volume: "Nuevo récord de volumen",
   reps: "Nuevo récord de repeticiones",
 };
 
 const TYPE_UNIT: Record<PersonalRecord["type"], string> = {
   weight: "kg",
   "1rm": "kg",
-  volume: "kg vol.",
   reps: "reps",
 };
 

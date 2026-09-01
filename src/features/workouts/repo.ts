@@ -138,7 +138,6 @@ export async function addSet(input: AddSetInput): Promise<AddSetResult> {
     await db.put("setEntries", set);
   }
 
-  const sessionVolumeSoFar = [...sameExerciseSets, set].reduce((sum, s) => sum + s.weightKg * s.reps, 0);
   const profile = await getProfile();
   const prsBroken = input.isWarmup
     ? []
@@ -149,7 +148,6 @@ export async function addSet(input: AddSetInput): Promise<AddSetResult> {
         reps: input.reps,
         completedAt,
         bodyweightKg: profile?.bodyweightKg ?? null,
-        sessionVolumeSoFar,
       });
 
   return { set, prsBroken };

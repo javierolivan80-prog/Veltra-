@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "@/design-system/components/Button";
 import { Dialog } from "@/design-system/components/Dialog";
 import { TextAreaField, TextField } from "@/design-system/components/TextField";
@@ -25,6 +25,10 @@ export function SleepLogDialog({
   const [quality, setQuality] = useState<number | null>(null);
   const [notes, setNotes] = useState("");
   const upsert = useUpsertSleepLog();
+  // Belt-and-suspenders guard alongside upsert.isPending: closes the brief gap
+  // before React re-renders the disabled button, so a fast double-tap can
+  // never fire this twice.
+  const isSaving = useRef(false);
 
   useEffect(() => {
     if (!open) return;
@@ -37,8 +41,18 @@ export function SleepLogDialog({
   }, [open, existing]);
 
   const save = async () => {
-    await upsert.mutateAsync({ date, bedTime, sleepTime, wakeTime, riseTime, quality, notes: notes.trim() || null });
-    onOpenChange(false);
+    if (isSaving.current) return;
+    isSaving.current = true;
+    try {
+      await upsert.mutateAsync({ date, bedTime, sleepTime, wakeTime, riseTime, quality, notes: notes.trim() || null });
+      onOpenChange(false);
+    } catch (err) {
+      // Without this, a failed tap (auth/network hiccup, etc.) looked like the
+      // button did nothing at all, and the log was silently never saved.
+      alert(err instanceof Error ? err.message : "No se pudo guardar el sueño. Inténtalo de nuevo.");
+    } finally {
+      isSaving.current = false;
+    }
   };
 
   return (

@@ -7,7 +7,7 @@ import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { Exercise, PersonalRecord, RecordType } from "@/types/models";
 import { estimatedOneRepMax } from "./stats";
 
-const TYPES: RecordType[] = ["weight", "1rm", "volume", "reps"];
+const TYPES: RecordType[] = ["weight", "1rm", "reps"];
 
 async function currentBest(exerciseId: string, type: RecordType): Promise<number | null> {
   const prs = await listPersonalRecords(exerciseId);
@@ -23,7 +23,6 @@ export interface NewSetContext {
   reps: number;
   completedAt: string;
   bodyweightKg: number | null;
-  sessionVolumeSoFar: number;
 }
 
 export async function checkAndRecordPRs(ctx: NewSetContext): Promise<PersonalRecord[]> {
@@ -31,7 +30,6 @@ export async function checkAndRecordPRs(ctx: NewSetContext): Promise<PersonalRec
   const candidates: Record<RecordType, number> = {
     weight: ctx.weightKg,
     "1rm": Math.round(estimatedOneRepMax(ctx.exercise, ctx.weightKg, ctx.reps, ctx.bodyweightKg) * 10) / 10,
-    volume: ctx.sessionVolumeSoFar,
     reps: ctx.reps,
   };
 

@@ -16,6 +16,10 @@
 const MUTED_KEY = "veltra-rest-alert-muted";
 
 let ctx: AudioContext | null = null;
+// Only ever ask once per page load — re-asking on every logged set is wasted
+// work and the native permission prompt can steal focus from the very tap
+// that's also supposed to log the set and start the rest.
+let notificationPermissionRequested = false;
 
 export function isAlertMuted(): boolean {
   try {
@@ -46,9 +50,14 @@ export function primeAlerts(): void {
     ctx = null;
   }
 
-  // A no-op once the user has already answered — safe to call every time.
-  if ("Notification" in window && Notification.permission === "default") {
-    void Notification.requestPermission();
+  if (notificationPermissionRequested) return;
+  try {
+    if ("Notification" in window && Notification.permission === "default") {
+      notificationPermissionRequested = true;
+      void Notification.requestPermission();
+    }
+  } catch {
+    // never let a permission-prompt failure break the action that called this
   }
 }
 

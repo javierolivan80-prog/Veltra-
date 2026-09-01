@@ -200,8 +200,6 @@ export async function seedDemoData(db: IDBPDatabase<VeltraDB>) {
 
   for (const [exerciseId, sets] of Object.entries(allSetsByExercise)) {
     const sorted = [...sets].sort((a, b) => a.completedAt.localeCompare(b.completedAt));
-    const isBodyweight = BODYWEIGHT_EXERCISE_IDS.has(exerciseId);
-    const loadOf = (weight: number) => (isBodyweight ? DEMO_BODYWEIGHT_KG + weight : weight);
 
     let maxWeight = -Infinity;
     let maxWeightSet = sorted[0];
@@ -226,18 +224,9 @@ export async function seedDemoData(db: IDBPDatabase<VeltraDB>) {
       }
     }
 
-    const bySession: Record<string, number> = {};
-    for (const set of sorted) {
-      bySession[set.sessionId] = (bySession[set.sessionId] ?? 0) + loadOf(set.weight) * set.reps;
-    }
-    const maxVolume = Math.max(...Object.values(bySession));
-    const maxVolumeSessionId = Object.entries(bySession).find(([, v]) => v === maxVolume)?.[0];
-    const maxVolumeSet = sorted.find((s) => s.sessionId === maxVolumeSessionId) ?? sorted[sorted.length - 1];
-
     await db.put("personalRecords", { id: generateId(), exerciseId, type: "weight", value: maxWeight, previousValue: null, achievedAt: maxWeightSet.completedAt, setEntryId: maxWeightSet.id });
     await db.put("personalRecords", { id: generateId(), exerciseId, type: "1rm", value: Math.round(max1rm * 10) / 10, previousValue: null, achievedAt: max1rmSet.completedAt, setEntryId: max1rmSet.id });
     await db.put("personalRecords", { id: generateId(), exerciseId, type: "reps", value: maxReps, previousValue: null, achievedAt: maxRepsSet.completedAt, setEntryId: maxRepsSet.id });
-    await db.put("personalRecords", { id: generateId(), exerciseId, type: "volume", value: Math.round(maxVolume), previousValue: null, achievedAt: maxVolumeSet.completedAt, setEntryId: maxVolumeSet.id });
   }
 
   for (const id of ["ex-bench-press", "ex-squat", "ex-pullup"]) {

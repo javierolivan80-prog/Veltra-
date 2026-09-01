@@ -8,7 +8,7 @@ import { Card } from "@/design-system/components/Card";
 import { StatNumber } from "@/design-system/components/StatNumber";
 import { useExercises } from "@/features/exercises/hooks";
 import { useSession, useSessionSets } from "@/features/workouts/hooks";
-import { formatDateLong, formatDuration, formatVolume, formatWeight } from "@/lib/format";
+import { formatDateLong, formatDuration, formatWeight } from "@/lib/format";
 
 export default function HistorySessionPage() {
   const params = useParams<{ sessionId: string }>();
@@ -26,8 +26,6 @@ export default function HistorySessionPage() {
     }
     return [...map.entries()];
   }, [sets]);
-
-  const totalVolume = useMemo(() => sets.reduce((sum, s) => sum + s.weightKg * s.reps, 0), [sets]);
 
   const durationSec = useMemo(() => {
     if (!session?.endedAt) return null;
@@ -61,11 +59,6 @@ export default function HistorySessionPage() {
           <StatNumber value={durationSec !== null ? formatDuration(durationSec) : "—"} size="sm" color="text-progress" label="Duración" />
         </Card>
       </div>
-
-      <Card raised>
-        <p className="text-ink-dim text-xs font-semibold uppercase tracking-wider mb-1">Volumen total</p>
-        <p className="text-ink text-2xl font-display">{formatVolume(totalVolume)}</p>
-      </Card>
 
       <div className="flex flex-col gap-3">
         {byExercise.map(([exerciseId, exerciseSets]) => (

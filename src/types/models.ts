@@ -141,7 +141,7 @@ export interface SetEntry {
   completedAt: string;
 }
 
-export type RecordType = "1rm" | "weight" | "volume" | "reps";
+export type RecordType = "1rm" | "weight" | "reps";
 
 export interface PersonalRecord {
   id: string;

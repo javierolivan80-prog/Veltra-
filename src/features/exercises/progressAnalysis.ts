@@ -1,17 +1,16 @@
 import type { Exercise, ExperienceLevel, Profile, SetEntry } from "@/types/models";
-import { oneRmSeries, repsSeries, volumeSeries, weightSeries, type SessionPoint } from "./stats";
+import { oneRmSeries, repsSeries, weightSeries, type SessionPoint } from "./stats";
 
-export type ProgressMetric = "weight" | "reps" | "volume" | "1rm";
+export type ProgressMetric = "weight" | "reps" | "1rm";
 export type Timeframe = "30d" | "3m" | "6m" | "1y" | "all";
 
 export const METRIC_LABEL: Record<ProgressMetric, string> = {
   weight: "Peso",
   reps: "Reps",
-  volume: "Volumen",
   "1rm": "1RM est.",
 };
 
-export const METRIC_UNIT: Record<ProgressMetric, string> = { weight: "kg", reps: "reps", volume: "kg", "1rm": "kg" };
+export const METRIC_UNIT: Record<ProgressMetric, string> = { weight: "kg", reps: "reps", "1rm": "kg" };
 
 export const TIMEFRAMES: { value: Timeframe; label: string; days: number | null }[] = [
   { value: "30d", label: "30 días", days: 30 },
@@ -59,8 +58,6 @@ function metricSeries(sets: SetEntry[], exercise: Exercise, bodyweightKg: number
       return weightSeries(sets);
     case "reps":
       return repsSeries(sets);
-    case "volume":
-      return volumeSeries(sets, exercise, bodyweightKg);
     case "1rm":
       return oneRmSeries(sets, exercise, bodyweightKg);
   }

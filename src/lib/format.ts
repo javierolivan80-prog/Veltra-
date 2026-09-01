@@ -3,12 +3,6 @@ export function formatWeight(kg: number): string {
   return Number.isInteger(rounded) ? `${rounded}` : rounded.toFixed(1);
 }
 
-/** Unit-inclusive — returns e.g. "1.4t" or "850kg", ready to display as-is. */
-export function formatVolume(kg: number): string {
-  if (kg >= 1000) return `${(kg / 1000).toFixed(1)}t`;
-  return `${Math.round(kg)}kg`;
-}
-
 export function formatDate(iso: string): string {
   const d = new Date(iso);
   return d.toLocaleDateString("es-ES", { day: "2-digit", month: "short" });

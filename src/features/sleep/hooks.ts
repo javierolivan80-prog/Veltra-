@@ -22,6 +22,10 @@ export function useUpsertSleepLog() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: SleepLogInput) => repo.upsertSleepLog(input),
+    // A couple of quick retries absorb the transient mobile-network blips
+    // that used to make this look like the button needed 2-3 taps to work.
+    retry: 2,
+    retryDelay: 1000,
     onSuccess: () => qc.invalidateQueries({ queryKey: sleepKeys.all }),
   });
 }

@@ -142,7 +142,10 @@ export async function logHabit(habitId: string, date: string, status: HabitLogSt
     const userId = await requireUserId();
     const existing = await supabase.from("habit_logs").select("id").eq("habit_id", habitId).eq("date", date).maybeSingle();
     const log: HabitLog = { id: existing.data?.id ?? generateId(), habitId, date, status, respondedAt: now };
-    const { error } = await supabase.from("habit_logs").upsert({ ...toSnakeCase(log), user_id: userId });
+    // onConflict targets the table's real unique key (one log per habit per
+    // day) rather than the client-generated id — see the identical comment
+    // in features/sleep/repo.ts's upsertSleepLog for why this matters.
+    const { error } = await supabase.from("habit_logs").upsert({ ...toSnakeCase(log), user_id: userId }, { onConflict: "habit_id,date" });
     if (error) throw error;
     return log;
   }

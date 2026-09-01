@@ -24,6 +24,7 @@ import {
 } from "@/features/workouts/hooks";
 import { primeAlerts } from "@/lib/alert";
 import { cn } from "@/lib/cn";
+import { errorMessage } from "@/lib/errors";
 import { formatDuration, formatWeight } from "@/lib/format";
 import { useWorkoutSessionStore } from "@/state/workoutSession.store";
 import type { Exercise, PersonalRecord, RankTier } from "@/types/models";
@@ -166,7 +167,7 @@ export default function ActiveWorkoutPage() {
     } catch (err) {
       // Without this, a failed tap (auth/network hiccup, etc.) looked like the
       // button did nothing at all, and the set was silently never logged.
-      alert(err instanceof Error ? err.message : "No se pudo registrar la serie. Inténtalo de nuevo.");
+      alert(errorMessage(err, "No se pudo registrar la serie. Inténtalo de nuevo."));
     } finally {
       isLoggingSet.current = false;
     }

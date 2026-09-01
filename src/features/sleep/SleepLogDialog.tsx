@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/design-system/components/Button";
 import { Dialog } from "@/design-system/components/Dialog";
 import { TextAreaField, TextField } from "@/design-system/components/TextField";
+import { errorMessage } from "@/lib/errors";
 import { useUpsertSleepLog } from "./hooks";
 import type { SleepLog } from "@/types/models";
 
@@ -49,7 +50,7 @@ export function SleepLogDialog({
     } catch (err) {
       // Without this, a failed tap (auth/network hiccup, etc.) looked like the
       // button did nothing at all, and the log was silently never saved.
-      alert(err instanceof Error ? err.message : "No se pudo guardar el sueño. Inténtalo de nuevo.");
+      alert(errorMessage(err, "No se pudo guardar el sueño. Inténtalo de nuevo."));
     } finally {
       isSaving.current = false;
     }

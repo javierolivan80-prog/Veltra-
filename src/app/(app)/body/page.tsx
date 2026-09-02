@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, Dumbbell, Moon, Scale, SlidersHorizontal, UtensilsCrossed, Cpu } from "lucide-react";
+import { ChevronDown, Dumbbell, Moon, Scale, SlidersHorizontal, UtensilsCrossed, Cpu, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { useDailyNutrition, useNutritionGoals } from "@/features/food/hooks";
@@ -16,35 +16,50 @@ import { formatRelativeTime } from "@/lib/format";
 
 const SLEEP_GOAL_MIN = 8 * 60;
 
-function CategoryRow({
-  href,
-  kicker,
-  kickerColor,
-  icon: Icon,
-  iconColor,
-  title,
-  meta,
-}: {
+interface Domain {
+  id: string;
   href: string;
   kicker: string;
   kickerColor: string;
-  icon: typeof Dumbbell;
+  icon: LucideIcon;
   iconColor: string;
   title: string;
   meta: string;
-}) {
+  detail: string;
+  cta: string;
+}
+
+/** Urgency-ordered, expandable domain card — collapsed shows the same
+ *  glanceable row as before; expanding reveals a fuller sentence and the
+ *  action that used to be the whole row's click target. */
+function DomainCard({ domain, expanded, onToggle }: { domain: Domain; expanded: boolean; onToggle: () => void }) {
+  const Icon = domain.icon;
   return (
-    <Link href={href} className="block border border-line-subtle rounded-lg bg-[#0E0E0E] px-4 py-3.5 hover:border-line transition-colors">
-      <p className={cn("text-[10.5px] font-bold uppercase tracking-[.1em] mb-1.5", kickerColor)}>{kicker}</p>
-      <div className="flex items-center gap-3">
-        <Icon size={17} className={cn(iconColor, "shrink-0")} />
+    <div className={cn("border rounded-lg bg-[#0E0E0E] px-4 py-3.5 transition-colors", expanded ? "border-line" : "border-line-subtle")}>
+      <button type="button" onClick={onToggle} className="flex items-center gap-3 w-full text-left">
+        <Icon size={17} className={cn(domain.iconColor, "shrink-0")} />
         <div className="flex-1 min-w-0">
-          <p className="text-ink font-display font-semibold text-[19px] truncate">{title}</p>
-          <p className="text-ink-faint text-xs mt-0.5 truncate">{meta}</p>
+          <p className={cn("text-[10.5px] font-bold uppercase tracking-[.1em] mb-1", domain.kickerColor)}>{domain.kicker}</p>
+          <p className="text-ink font-display font-semibold text-[19px] truncate">{domain.title}</p>
+          <p className="text-ink-faint text-xs mt-0.5 truncate">{domain.meta}</p>
         </div>
-        <ChevronDown size={16} className="text-ink-faint shrink-0" />
-      </div>
-    </Link>
+        <ChevronDown size={16} className={cn("text-ink-faint shrink-0 transition-transform", expanded && "rotate-180")} />
+      </button>
+      {expanded ? (
+        <div className="mt-3 pt-3 border-t border-line-subtle">
+          <p className="text-ink-dim text-[13px] leading-5">{domain.detail}</p>
+          <Link
+            href={domain.href}
+            className={cn(
+              "mt-3 flex items-center justify-center w-full py-2.5 rounded-lg border border-current text-sm font-semibold hover:bg-white/5 transition-colors",
+              domain.iconColor
+            )}
+          >
+            {domain.cta}
+          </Link>
+        </div>
+      ) : null}
+    </div>
   );
 }
 
@@ -60,6 +75,7 @@ export default function BodyPage() {
   const { data: profile } = useProfile();
   const { data: weightLogs = [] } = useBodyWeightLogs();
   const [nowMs] = useState(() => Date.now());
+  const [expandedId, setExpandedId] = useState("workout");
 
   const suggestedRoutine = useMemo(() => {
     if (routines.length === 0) return null;
@@ -107,6 +123,90 @@ export default function BodyPage() {
     return "Registra tu entreno de hoy para que Veltra empiece a analizar tu progreso.";
   }, [sleepBars, allSleepLogs, recentSessions, streak, nowMs]);
 
+  const domains: Domain[] = useMemo(
+    () => [
+      {
+        id: "workout",
+        href: "/routines",
+        kicker: "Entrenamiento",
+        kickerColor: "text-progress",
+        icon: Dumbbell,
+        iconColor: "text-progress",
+        title: suggestedRoutine?.name ?? "Crea tu primera rutina",
+        meta: suggestedRoutine
+          ? `${suggestedRoutine.exercises.length} ejercicios${lastSessionForSuggested ? ` · última ${formatRelativeTime(lastSessionForSuggested.startedAt)}` : ""}`
+          : "Empieza por definir tu rutina",
+        detail: suggestedRoutine
+          ? `Te esperan ${suggestedRoutine.exercises.length} ejercicios. ${
+              lastSessionForSuggested ? `Tu última sesión fue ${formatRelativeTime(lastSessionForSuggested.startedAt)}.` : "Aún no la has entrenado."
+            }`
+          : "Todavía no tienes rutinas — crea la primera para que Veltra te sugiera qué entrenar cada día.",
+        cta: "Ver rutina",
+      },
+      {
+        id: "sleep",
+        href: "/sleep",
+        kicker: "Sueño",
+        kickerColor: "text-sleep",
+        icon: Moon,
+        iconColor: "text-sleep",
+        title: lastNight ? formatHoursMinutes(sleptMinutes(lastNight)) : "Sin registrar",
+        meta: lastNight
+          ? `${lastNight.quality ? `Calidad ${lastNight.quality}/10` : "Sin calidad"}${
+              sleptMinutes(lastNight) < SLEEP_GOAL_MIN ? ` · te faltan ${formatHoursMinutes(SLEEP_GOAL_MIN - sleptMinutes(lastNight))} para tu objetivo` : ""
+            }`
+          : "Registra cómo dormiste anoche",
+        detail: lastNight
+          ? `${lastNight.quality ? `Dormiste con calidad ${lastNight.quality}/10.` : "No registraste la calidad."} ${
+              sleptMinutes(lastNight) < SLEEP_GOAL_MIN
+                ? `Te faltaron ${formatHoursMinutes(SLEEP_GOAL_MIN - sleptMinutes(lastNight))} para tu objetivo de 8h.`
+                : "Cumpliste tu objetivo de sueño."
+            }`
+          : "Registra cómo dormiste anoche para que Veltra vigile tu recuperación.",
+        cta: "Ver sueño",
+      },
+      {
+        id: "nutrition",
+        href: "/food",
+        kicker: "Nutrición",
+        kickerColor: "text-progress",
+        icon: UtensilsCrossed,
+        iconColor: "text-progress",
+        title: nutrition && nutrition.mealCount > 0 ? `${Math.round(nutrition.calories)} / ${Math.round(nutritionGoals?.calories ?? 2400)} kcal` : "Sin registrar hoy",
+        meta:
+          nutrition && nutrition.mealCount > 0
+            ? `P ${Math.round(nutrition.protein)} g · C ${Math.round(nutrition.carbs)} g · G ${Math.round(nutrition.fat)} g`
+            : "Registra lo que has comido",
+        detail:
+          nutrition && nutrition.mealCount > 0
+            ? `Llevas ${Math.round(nutrition.calories)} de ${Math.round(nutritionGoals?.calories ?? 2400)} kcal — proteína ${Math.round(
+                nutrition.protein
+              )} g, carbohidratos ${Math.round(nutrition.carbs)} g, grasa ${Math.round(nutrition.fat)} g.`
+            : "Registra lo que has comido hoy, aunque sea a ojo — Veltra calcula los macros.",
+        cta: "Ver nutrición",
+      },
+      {
+        id: "weight",
+        href: "/weight",
+        kicker: "Peso corporal",
+        kickerColor: "text-info",
+        icon: Scale,
+        iconColor: "text-info",
+        title: profile?.bodyweightKg ? `${profile.bodyweightKg} kg` : "Sin registrar",
+        meta:
+          weightTrendKg !== null
+            ? `${weightTrendKg <= 0 ? "↓" : "↑"} ${Math.abs(weightTrendKg)} kg en 30 días${latestWeightTime ? ` · medido hoy ${latestWeightTime}` : ""}`
+            : "Registra tu peso para ver la tendencia",
+        detail:
+          weightTrendKg !== null
+            ? `Tu peso ha ${weightTrendKg < 0 ? "bajado" : weightTrendKg > 0 ? "subido" : "aguantado"} ${Math.abs(weightTrendKg)} kg en los últimos 30 días.`
+            : "Registra tu peso un par de veces al mes para ver la tendencia.",
+        cta: "Ver peso",
+      },
+    ],
+    [suggestedRoutine, lastSessionForSuggested, lastNight, nutrition, nutritionGoals, profile, weightTrendKg, latestWeightTime]
+  );
+
   return (
     <div className="flex flex-col gap-6">
       <div className="flex items-start justify-between">
@@ -120,56 +220,9 @@ export default function BodyPage() {
       </div>
 
       <div className="flex flex-col gap-2.5">
-        <CategoryRow
-          href="/routines"
-          kicker="Entrenamiento"
-          kickerColor="text-progress"
-          icon={Dumbbell}
-          iconColor="text-progress"
-          title={suggestedRoutine?.name ?? "Crea tu primera rutina"}
-          meta={
-            suggestedRoutine
-              ? `${suggestedRoutine.exercises.length} ejercicios${lastSessionForSuggested ? ` · última ${formatRelativeTime(lastSessionForSuggested.startedAt)}` : ""}`
-              : "Empieza por definir tu rutina"
-          }
-        />
-        <CategoryRow
-          href="/sleep"
-          kicker="Sueño"
-          kickerColor="text-sleep"
-          icon={Moon}
-          iconColor="text-sleep"
-          title={lastNight ? formatHoursMinutes(sleptMinutes(lastNight)) : "Sin registrar"}
-          meta={
-            lastNight
-              ? `${lastNight.quality ? `Calidad ${lastNight.quality}/10` : "Sin calidad"}${
-                  sleptMinutes(lastNight) < SLEEP_GOAL_MIN ? ` · te faltan ${formatHoursMinutes(SLEEP_GOAL_MIN - sleptMinutes(lastNight))} para tu objetivo` : ""
-                }`
-              : "Registra cómo dormiste anoche"
-          }
-        />
-        <CategoryRow
-          href="/food"
-          kicker="Nutrición"
-          kickerColor="text-progress"
-          icon={UtensilsCrossed}
-          iconColor="text-progress"
-          title={nutrition && nutrition.mealCount > 0 ? `${Math.round(nutrition.calories)} / ${Math.round(nutritionGoals?.calories ?? 2400)} kcal` : "Sin registrar hoy"}
-          meta={nutrition && nutrition.mealCount > 0 ? `P ${Math.round(nutrition.protein)} g · C ${Math.round(nutrition.carbs)} g · G ${Math.round(nutrition.fat)} g` : "Registra lo que has comido"}
-        />
-        <CategoryRow
-          href="/weight"
-          kicker="Peso corporal"
-          kickerColor="text-info"
-          icon={Scale}
-          iconColor="text-info"
-          title={profile?.bodyweightKg ? `${profile.bodyweightKg} kg` : "Sin registrar"}
-          meta={
-            weightTrendKg !== null
-              ? `${weightTrendKg <= 0 ? "↓" : "↑"} ${Math.abs(weightTrendKg)} kg en 30 días${latestWeightTime ? ` · medido hoy ${latestWeightTime}` : ""}`
-              : "Registra tu peso para ver la tendencia"
-          }
-        />
+        {domains.map((d) => (
+          <DomainCard key={d.id} domain={d} expanded={expandedId === d.id} onToggle={() => setExpandedId(expandedId === d.id ? "" : d.id)} />
+        ))}
       </div>
 
       <div>

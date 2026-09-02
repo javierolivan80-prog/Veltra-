@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Focus, Frown, Meh, Plus, Smile, Sparkles } from "lucide-react";
+import { BookOpen, Brain, Check, Focus, Frown, Meh, Plus, Smile, Sparkles, Target, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useMemo, useState } from "react";
 import { HabitFormDialog } from "@/features/habits/HabitFormDialog";
@@ -12,7 +12,7 @@ import { computeMeditationStreak } from "@/features/meditation/stats";
 import { buildMenteInsight, type DailyTrackable } from "@/features/mind/insights";
 import { useDailyMoodByDate, useUpsertDailyMood } from "@/features/mood/hooks";
 import { cn } from "@/lib/cn";
-import { computeDayStreak, shiftDayKey, todayKey } from "@/lib/date";
+import { computeDayStreak, lastNDayKeys, shiftDayKey, todayKey } from "@/lib/date";
 import type { HabitLog, MoodOption } from "@/types/models";
 
 const MOOD_OPTIONS: { value: MoodOption; label: string; icon: typeof Frown }[] = [
@@ -41,16 +41,25 @@ function habitStatus(logs: HabitLog[]): { done: boolean; meta: string } {
   return { done, meta: current > 0 ? `${streakLabel(current)} · pendiente hoy` : "Pendiente hoy" };
 }
 
+/** Last 7 local days, oldest first, as done/not-done against a set of day keys. */
+function last7Dots(doneDates: Set<string>): boolean[] {
+  return lastNDayKeys(7).map((d) => doneDates.has(d));
+}
+
 function ChecklistRow({
+  icon: Icon,
   name,
   meta,
   done,
+  dots,
   onToggle,
   href,
 }: {
+  icon: LucideIcon;
   name: string;
   meta: string;
   done: boolean;
+  dots: boolean[];
   onToggle?: () => void;
   href?: string;
 }) {
@@ -65,11 +74,22 @@ function ChecklistRow({
     </span>
   );
 
-  const text = (
-    <div className="flex-1 min-w-0">
-      <p className={cn("font-semibold truncate", done ? "text-ink-faint line-through" : "text-ink")}>{name}</p>
-      <p className="text-ink-faint text-xs mt-0.5 truncate">{meta}</p>
-    </div>
+  const content = (
+    <>
+      <Icon size={17} className="text-ai shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className={cn("font-semibold truncate", done ? "text-ink-faint line-through" : "text-ink")}>{name}</p>
+        <div className="flex items-center gap-2 mt-1.5">
+          <span className="flex gap-[3px] shrink-0">
+            {dots.map((d, i) => (
+              <span key={i} className={cn("w-1.5 h-1.5 rounded-full", d ? "bg-ai" : "bg-line")} />
+            ))}
+          </span>
+          <span className="text-ink-faint text-xs truncate">{meta}</span>
+        </div>
+      </div>
+      {checkbox}
+    </>
   );
 
   const rowClass = "flex items-center gap-3 bg-surface-raised border border-line-subtle rounded-2xl px-4 py-3.5";
@@ -77,19 +97,15 @@ function ChecklistRow({
   if (href) {
     return (
       <Link href={href} className={rowClass}>
-        {checkbox}
-        {text}
+        {content}
       </Link>
     );
   }
 
   return (
-    <div className={rowClass}>
-      <button type="button" onClick={onToggle} disabled={done} aria-label={done ? `${name} completado` : `Marcar ${name} como hecho`} className="shrink-0">
-        {checkbox}
-      </button>
-      {text}
-    </div>
+    <button type="button" onClick={onToggle} disabled={done} className={cn(rowClass, "text-left w-full", done && "cursor-default")}>
+      {content}
+    </button>
   );
 }
 
@@ -109,11 +125,14 @@ export default function MindPage() {
   const meditationStreak = useMemo(() => computeMeditationStreak(meditationSessions), [meditationSessions]);
   const journalStreak = useMemo(() => computeDayStreak(journalEntries.map((e) => e.date)), [journalEntries]);
 
+  const meditationDots = useMemo(() => last7Dots(new Set(meditationSessions.map((s) => s.completedAt.slice(0, 10)))), [meditationSessions]);
+  const journalDots = useMemo(() => last7Dots(new Set(journalEntries.map((e) => e.date))), [journalEntries]);
+
   const habitRows = useMemo(
     () =>
       habits.map((h) => {
         const logs = allHabitLogs.filter((l) => l.habitId === h.id);
-        return { habit: h, ...habitStatus(logs) };
+        return { habit: h, ...habitStatus(logs), dots: last7Dots(new Set(logs.filter((l) => l.status === "done").map((l) => l.date))) };
       }),
     [habits, allHabitLogs]
   );
@@ -164,23 +183,29 @@ export default function MindPage() {
 
       <div className="flex flex-col gap-2.5">
         <ChecklistRow
+          icon={Brain}
           name="Meditar"
           meta={meditatedToday ? (meditationStreak > 0 ? streakLabel(meditationStreak) : "Hecho hoy") : meditationStreak > 0 ? `${streakLabel(meditationStreak)} · pendiente hoy` : "Pendiente hoy"}
           done={meditatedToday}
+          dots={meditationDots}
           href="/meditation"
         />
         <ChecklistRow
+          icon={BookOpen}
           name="Journaling"
           meta={todayJournalEntry ? (journalStreak > 0 ? streakLabel(journalStreak) : "Hecho hoy") : journalStreak > 0 ? `${streakLabel(journalStreak)} · pendiente hoy` : "Pendiente hoy"}
           done={!!todayJournalEntry}
+          dots={journalDots}
           href="/journal"
         />
-        {habitRows.map(({ habit, done, meta }) => (
+        {habitRows.map(({ habit, done, meta, dots }) => (
           <ChecklistRow
             key={habit.id}
+            icon={Target}
             name={habit.name}
             meta={meta}
             done={done}
+            dots={dots}
             onToggle={() => logHabit.mutate({ habitId: habit.id, date: today, status: "done" })}
           />
         ))}

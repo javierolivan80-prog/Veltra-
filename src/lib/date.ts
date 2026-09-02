@@ -36,6 +36,22 @@ export function lastNDayKeys(n: number, endKey: string = todayKey()): string[] {
   return Array.from({ length: n }, (_, i) => shiftDayKey(endKey, -(n - 1 - i)));
 }
 
+/** Days-consecutive streak ending today (or yesterday if today has no entry
+ *  yet — today alone never breaks a streak) from a flat list of day keys.
+ *  Duplicates and order don't matter. */
+export function computeDayStreak(dates: string[]): number {
+  if (dates.length === 0) return 0;
+  const days = new Set(dates);
+  let cursor = todayKey();
+  if (!days.has(cursor)) cursor = shiftDayKey(cursor, -1);
+  let streak = 0;
+  while (days.has(cursor)) {
+    streak++;
+    cursor = shiftDayKey(cursor, -1);
+  }
+  return streak;
+}
+
 const WEEKDAY_NAMES_ES = ["Domingo", "Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado"];
 
 /** ISO-8601 week number (1-53), Monday as the first day of the week. */

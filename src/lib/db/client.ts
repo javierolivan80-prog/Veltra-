@@ -52,7 +52,6 @@ export function getDb(): Promise<IDBPDatabase<VeltraDB>> {
           db.createObjectStore("sleepLogs", { keyPath: "id" }).createIndex("date", "date");
           db.createObjectStore("addictions", { keyPath: "id" });
           db.createObjectStore("addictionRelapses", { keyPath: "id" }).createIndex("addictionId", "addictionId");
-          db.createObjectStore("pushSubscriptions", { keyPath: "id" });
         }
         if (oldVersion < 5) {
           db.createObjectStore("waterLogs", { keyPath: "id" }).createIndex("date", "date");
@@ -68,6 +67,15 @@ export function getDb(): Promise<IDBPDatabase<VeltraDB>> {
         }
         if (oldVersion < 6) {
           db.createObjectStore("dailyMoods", { keyPath: "id" }).createIndex("date", "date");
+        }
+        if (oldVersion < 7) {
+          db.createObjectStore("contracts", { keyPath: "id" }).createIndex("status", "status");
+          db.createObjectStore("commitments", { keyPath: "id" }).createIndex("contractId", "contractId");
+          // Created in v4 and never read or written since: push subscriptions
+          // live server-side in Supabase, registered from the API route.
+          if (db.objectStoreNames.contains("pushSubscriptions" as never)) {
+            db.deleteObjectStore("pushSubscriptions" as never);
+          }
         }
       },
     }).then(async (db) => {

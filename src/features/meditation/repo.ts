@@ -1,44 +1,31 @@
-import { getDb } from "@/lib/db/client";
+import { dual, ok, rows } from "@/lib/db/dual";
 import { generateId } from "@/lib/id";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { toCamelCase, toSnakeCase } from "@/lib/supabase/case";
-import { requireUserId } from "@/lib/supabase/currentUser";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { toSnakeCase } from "@/lib/supabase/case";
 import type { MeditationSession } from "@/types/models";
 
 export async function listMeditationSessions(): Promise<MeditationSession[]> {
-  if (isSupabaseConfigured) {
-    const supabase = getSupabaseBrowserClient()!;
-    const { data, error } = await supabase.from("meditation_sessions").select("*").order("completed_at", { ascending: true });
-    if (error) return [];
-    return (data ?? []).map((r: any) => toCamelCase<MeditationSession>(r));
-  }
-  const db = await getDb();
-  const all = await db.getAllFromIndex("meditationSessions", "completedAt");
-  return all;
+  return dual({
+    cloud: async (supabase) =>
+      rows<MeditationSession>(await supabase.from("meditation_sessions").select("*").order("completed_at", { ascending: true })),
+    local: (db) => db.getAllFromIndex("meditationSessions", "completedAt"),
+  });
 }
 
 export async function addMeditationSession(durationMinutes: number): Promise<MeditationSession> {
   const now = new Date().toISOString();
   const session: MeditationSession = { id: generateId(), durationMinutes, completedAt: now, createdAt: now };
-  if (isSupabaseConfigured) {
-    const supabase = getSupabaseBrowserClient()!;
-    const userId = await requireUserId();
-    const { error } = await supabase.from("meditation_sessions").insert({ ...toSnakeCase(session), user_id: userId });
-    if (error) throw error;
-  } else {
-    const db = await getDb();
-    await db.put("meditationSessions", session);
-  }
+  await dual({
+    cloud: async (supabase, userId) => ok(await supabase.from("meditation_sessions").insert({ ...toSnakeCase(session), user_id: await userId() })),
+    local: async (db) => void (await db.put("meditationSessions", session)),
+  });
   return session;
 }
 
 export async function deleteMeditationSession(id: string): Promise<void> {
-  if (isSupabaseConfigured) {
-    const supabase = getSupabaseBrowserClient()!;
-    await supabase.from("meditation_sessions").delete().eq("id", id);
-    return;
-  }
-  const db = await getDb();
-  await db.delete("meditationSessions", id);
+  await dual({
+    // Deletes stay best-effort, as before: the row is already gone from the
+    // user's view and a failed delete is not worth blocking them on.
+    cloud: async (supabase) => void (await supabase.from("meditation_sessions").delete().eq("id", id)),
+    local: (db) => db.delete("meditationSessions", id),
+  });
 }

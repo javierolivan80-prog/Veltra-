@@ -1,21 +1,13 @@
-import { getDb } from "@/lib/db/client";
+import { dual, ok, rows } from "@/lib/db/dual";
 import { generateId } from "@/lib/id";
-import { getSupabaseBrowserClient } from "@/lib/supabase/client";
-import { toCamelCase, toSnakeCase } from "@/lib/supabase/case";
-import { requireUserId } from "@/lib/supabase/currentUser";
-import { isSupabaseConfigured } from "@/lib/supabase/env";
+import { toSnakeCase } from "@/lib/supabase/case";
 import type { DailyMood, MoodOption } from "@/types/models";
 
 export async function listDailyMoods(): Promise<DailyMood[]> {
-  if (isSupabaseConfigured) {
-    const supabase = getSupabaseBrowserClient()!;
-    const { data, error } = await supabase.from("daily_moods").select("*").order("date", { ascending: true });
-    if (error) return [];
-    return (data ?? []).map((r: any) => toCamelCase<DailyMood>(r));
-  }
-  const db = await getDb();
-  const all = await db.getAllFromIndex("dailyMoods", "date");
-  return all;
+  return dual({
+    cloud: async (supabase) => rows<DailyMood>(await supabase.from("daily_moods").select("*").order("date", { ascending: true })),
+    local: (db) => db.getAllFromIndex("dailyMoods", "date"),
+  });
 }
 
 export async function getDailyMoodByDate(date: string): Promise<DailyMood | null> {
@@ -34,17 +26,13 @@ export async function upsertDailyMood(date: string, mood: MoodOption): Promise<D
     updatedAt: now,
   };
 
-  if (isSupabaseConfigured) {
-    const supabase = getSupabaseBrowserClient()!;
-    const userId = await requireUserId();
+  await dual({
     // onConflict targets the table's real unique key (one mood per user per
     // day) rather than the client-generated id — see the identical comment
     // in features/sleep/repo.ts's upsertSleepLog for why this matters.
-    const { error } = await supabase.from("daily_moods").upsert({ ...toSnakeCase(entry), user_id: userId }, { onConflict: "user_id,date" });
-    if (error) throw error;
-  } else {
-    const db = await getDb();
-    await db.put("dailyMoods", entry);
-  }
+    cloud: async (supabase, userId) =>
+      ok(await supabase.from("daily_moods").upsert({ ...toSnakeCase(entry), user_id: await userId() }, { onConflict: "user_id,date" })),
+    local: async (db) => void (await db.put("dailyMoods", entry)),
+  });
   return entry;
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Scale, Trash2 } from "lucide-react";
+import { ChevronRight, ExternalLink, Scale, ShieldAlert, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Badge } from "@/design-system/components/Badge";
@@ -9,8 +9,10 @@ import { Card } from "@/design-system/components/Card";
 import { SectionHeader } from "@/design-system/components/SectionHeader";
 import { StatNumber } from "@/design-system/components/StatNumber";
 import { TextField } from "@/design-system/components/TextField";
+import { dayOfArc } from "@/features/contract/arc";
+import { useActiveContract } from "@/features/contract/hooks";
 import { EditProfileDialog } from "@/features/profile/EditProfileDialog";
-import { useAddInjury, useDeleteInjury, useInjuries, useProfile, useToggleInjury } from "@/features/profile/hooks";
+import { useAddInjury, useDeleteInjury, useInjuries, useProfile, useSetRecoveryEnabled, useToggleInjury } from "@/features/profile/hooks";
 import { useCurrentStreak, useRecentSessions } from "@/features/workouts/hooks";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { useAuthStore } from "@/state/auth.store";
@@ -24,6 +26,8 @@ export default function ProfilePage() {
   const { data: streak = 0 } = useCurrentStreak();
   const { data: sessions = [] } = useRecentSessions(200);
   const { data: injuries = [] } = useInjuries();
+  const { data: contract } = useActiveContract();
+  const setRecoveryEnabled = useSetRecoveryEnabled();
   const addInjury = useAddInjury();
   const toggleInjury = useToggleInjury();
   const deleteInjury = useDeleteInjury();
@@ -67,6 +71,22 @@ export default function ProfilePage() {
           </div>
         </div>
       </Card>
+
+      {contract ? (
+        <Link
+          href="/contract"
+          className="flex items-center justify-between rounded-2xl border border-line-subtle bg-surface-raised px-5 py-4 hover:border-line transition-colors"
+        >
+          <div className="min-w-0">
+            <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em]">Tu contrato</p>
+            <p className="text-ink text-[15px] font-semibold mt-1.5">
+              Día {dayOfArc(contract)} de {contract.durationDays}
+            </p>
+            <p className="text-ink-dim text-xs mt-0.5 truncate">Cambia cuándo cumples cada compromiso, o termina el arco.</p>
+          </div>
+          <ChevronRight size={18} className="text-ink-faint shrink-0" />
+        </Link>
+      ) : null}
 
       <div className="grid grid-cols-3 gap-3">
         <Card raised>
@@ -146,6 +166,73 @@ export default function ProfilePage() {
             <Badge key={eq} label={EQUIPMENT_LABEL[eq] ?? eq} tone="neutral" />
           ))}
         </div>
+      </div>
+
+      <div>
+        <SectionHeader title="Recuperación" />
+        <Card raised>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-ink text-sm font-semibold">Llevar la cuenta de algo que quiero dejar</p>
+              <p className="text-ink-dim text-xs mt-1 leading-5">
+                Si lo activas, aparece como un bloque en Hoy. Si no, no se te menciona en ningún sitio.
+              </p>
+            </div>
+            <button
+              onClick={() => setRecoveryEnabled.mutate(!profile.recoveryEnabled)}
+              role="switch"
+              aria-checked={!!profile.recoveryEnabled}
+              aria-label="Activar Recuperación"
+              className={`w-12 h-7 rounded-full border shrink-0 transition-colors ${
+                profile.recoveryEnabled ? "bg-progress border-progress" : "bg-surface border-line"
+              }`}
+            >
+              <span
+                className={`block w-5 h-5 rounded-full bg-bg-deep transition-transform ${profile.recoveryEnabled ? "translate-x-6" : "translate-x-1"}`}
+              />
+            </button>
+          </div>
+
+          {profile.recoveryEnabled ? (
+            <div className="mt-4 pt-4 border-t border-line-subtle flex flex-col gap-3">
+              <Link href="/addictions" className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-9 h-9 rounded-full bg-addiction-bg flex items-center justify-center shrink-0">
+                    <ShieldAlert size={17} className="text-addiction" />
+                  </span>
+                  <p className="text-ink text-sm font-semibold">Lo que estoy dejando</p>
+                </div>
+                <ChevronRight size={18} className="text-ink-faint shrink-0" />
+              </Link>
+
+              <div className="pt-1">
+                <p className="text-ink-dim text-xs leading-5">
+                  Veltra cuenta días. No sustituye a nadie que sepa de esto. Si lo estás pasando mal, aquí hay ayuda de verdad:
+                </p>
+                <div className="flex flex-col gap-2 mt-2.5">
+                  <a
+                    href="https://pnsd.sanidad.gob.es"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-info text-xs font-semibold"
+                  >
+                    Plan Nacional sobre Drogas · Ministerio de Sanidad
+                    <ExternalLink size={12} className="shrink-0" />
+                  </a>
+                  <a
+                    href="https://www.alcoholicos-anonimos.org"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 text-info text-xs font-semibold"
+                  >
+                    Alcohólicos Anónimos España
+                    <ExternalLink size={12} className="shrink-0" />
+                  </a>
+                </div>
+              </div>
+            </div>
+          ) : null}
+        </Card>
       </div>
 
       <div>

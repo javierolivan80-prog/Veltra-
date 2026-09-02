@@ -4,6 +4,8 @@ import type {
   AddictionRelapse,
   BodyWeightLog,
   CoachMessage,
+  Commitment,
+  Contract,
   Conversation,
   DailyMood,
   Exercise,
@@ -26,7 +28,6 @@ import type {
   SavedMeal,
   PersonalRecord,
   Profile,
-  PushSubscriptionRow,
   Routine,
   RoutineExercise,
   ScreenTimeLog,
@@ -37,7 +38,7 @@ import type {
 } from "@/types/models";
 
 export const DB_NAME = "veltra";
-export const DB_VERSION = 6;
+export const DB_VERSION = 7;
 
 /** Single-row store for the local nutrition goals — mirrors the per-user Supabase row. */
 export type StoredNutritionGoals = NutritionGoals & { id: string };
@@ -78,7 +79,6 @@ export interface VeltraDB extends DBSchema {
   sleepLogs: { key: string; value: SleepLog; indexes: { date: string } };
   addictions: { key: string; value: Addiction };
   addictionRelapses: { key: string; value: AddictionRelapse; indexes: { addictionId: string } };
-  pushSubscriptions: { key: string; value: PushSubscriptionRow };
   waterLogs: { key: string; value: WaterLog; indexes: { date: string } };
   mealChecks: { key: string; value: MealCheck; indexes: { date: string } };
   meditationSessions: { key: string; value: MeditationSession; indexes: { completedAt: string } };
@@ -90,6 +90,8 @@ export interface VeltraDB extends DBSchema {
   goals: { key: string; value: LifeGoal };
   goalCheckpoints: { key: string; value: GoalCheckpoint; indexes: { goalId: string } };
   dailyMoods: { key: string; value: DailyMood; indexes: { date: string } };
+  contracts: { key: string; value: Contract; indexes: { status: string } };
+  commitments: { key: string; value: Commitment; indexes: { contractId: string } };
 }
 
 export const STORE_NAMES = [
@@ -115,7 +117,6 @@ export const STORE_NAMES = [
   "sleepLogs",
   "addictions",
   "addictionRelapses",
-  "pushSubscriptions",
   "waterLogs",
   "mealChecks",
   "meditationSessions",
@@ -127,4 +128,6 @@ export const STORE_NAMES = [
   "goals",
   "goalCheckpoints",
   "dailyMoods",
+  "contracts",
+  "commitments",
 ] as const;

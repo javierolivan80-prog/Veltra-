@@ -32,10 +32,10 @@ function AddictionCard({ addiction, onOpen, onRelapse }: { addiction: Addiction;
       {addiction.motivation ? <p className="text-ink-dim text-sm mt-3 leading-5">&ldquo;{addiction.motivation}&rdquo;</p> : null}
       <div className="flex items-center justify-between mt-4 gap-3">
         <p className="text-ink-faint text-xs">
-          {lastRelapse ? `Última caída ${formatRelativeTime(lastRelapse.fallenAt)}` : "Ninguna caída registrada"} · {relapses.length} en total
+          {lastRelapse ? `Última recaída ${formatRelativeTime(lastRelapse.fallenAt)}` : "Sin recaídas registradas"}
         </p>
-        <button onClick={onRelapse} className="shrink-0 px-4 py-2 rounded-full bg-addiction text-bg-deep text-sm font-bold">
-          Caí
+        <button onClick={onRelapse} className="shrink-0 px-4 py-2 rounded-full border border-line text-ink-dim text-sm font-semibold">
+          He recaído
         </button>
       </div>
     </Card>
@@ -50,11 +50,10 @@ export default function AddictionsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <CategoryBackLink href="/recovery" label="Recuperación" />
+      <CategoryBackLink href="/profile" label="Perfil" />
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-ink-dim text-sm">Recuperación</p>
-          <h1 className="text-ink text-2xl font-display mt-0.5">Adicciones</h1>
+          <h1 className="text-ink text-2xl font-display">Lo que estoy dejando</h1>
         </div>
         <button
           onClick={() => setFormOpen(true)}
@@ -69,7 +68,7 @@ export default function AddictionsPage() {
         <Card raised>
           <EmptyState
             icon={<ShieldAlert size={28} className="text-addiction" />}
-            title="Todavía no rastreas nada"
+            title="Todavía no llevas la cuenta de nada"
             description="Añade lo que quieras dejar y Veltra contará el tiempo que llevas sin caer."
             actionLabel="Añadir"
             onAction={() => setFormOpen(true)}
@@ -82,6 +81,20 @@ export default function AddictionsPage() {
           ))}
         </div>
       )}
+
+      <div className="border-t border-line-subtle pt-4">
+        <p className="text-ink-dim text-xs leading-5">
+          Veltra cuenta días. No sustituye a nadie que sepa de esto. Si lo estás pasando mal:
+        </p>
+        <div className="flex flex-col gap-2 mt-2.5">
+          <a href="https://pnsd.sanidad.gob.es" target="_blank" rel="noopener noreferrer" className="text-info text-xs font-semibold">
+            Plan Nacional sobre Drogas · Ministerio de Sanidad
+          </a>
+          <a href="https://www.alcoholicos-anonimos.org" target="_blank" rel="noopener noreferrer" className="text-info text-xs font-semibold">
+            Alcohólicos Anónimos España
+          </a>
+        </div>
+      </div>
 
       <AddictionFormDialog open={formOpen} onOpenChange={setFormOpen} />
       {relapseFor ? <RelapseDialog open={relapseFor !== null} onOpenChange={(open) => !open && setRelapseFor(null)} addictionId={relapseFor} /> : null}

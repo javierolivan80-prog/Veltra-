@@ -1,5 +1,6 @@
 import type { IDBPDatabase } from "idb";
 import { generateId } from "@/lib/id";
+import { dayKey, shiftDayKey } from "@/lib/date";
 import { estimatedOneRepMax } from "@/features/exercises/stats";
 import type { VeltraDB } from "./schema";
 import { STORE_NAMES } from "./schema";
@@ -65,6 +66,31 @@ export async function seedDemoData(db: IDBPDatabase<VeltraDB>) {
   const now = new Date();
   const nowIso = now.toISOString();
 
+  // El contrato entra en los datos de ejemplo porque sin él no se pasa del
+  // muro de Hoy. Empieza dos semanas atrás para que el arco ya tenga recorrido
+  // que enseñar en vez de arrancar en el día 1.
+  const contractStart = shiftDayKey(dayKey(now), -13);
+  const contractId = generateId();
+  await db.put("contracts", {
+    id: contractId,
+    focus: "body",
+    why: "Porque llevo dos años diciendo que empiezo el lunes.",
+    durationDays: 90,
+    startedOn: contractStart,
+    endsOn: shiftDayKey(contractStart, 89),
+    status: "active",
+    createdAt: nowIso,
+    updatedAt: nowIso,
+  });
+  const demoCommitments = [
+    { kind: "workout" as const, title: "Entrenar", days: [1, 3, 5], timeSlot: "evening" as const },
+    { kind: "sleep" as const, title: "Dormir 7-8 horas", days: [0, 1, 2, 3, 4, 5, 6], timeSlot: "morning" as const },
+    { kind: "nutrition" as const, title: "Registrar lo que como", days: [0, 1, 2, 3, 4, 5, 6], timeSlot: "evening" as const },
+  ];
+  for (const [i, c] of demoCommitments.entries()) {
+    await db.put("commitments", { id: generateId(), contractId, ...c, position: i, createdAt: nowIso, updatedAt: nowIso });
+  }
+
   await db.put("profile", {
     id: "local",
     fullName: "Alex Veltra",
@@ -79,6 +105,7 @@ export async function seedDemoData(db: IDBPDatabase<VeltraDB>) {
     equipmentAvailable: ["barbell", "dumbbell", "machine", "cable", "bodyweight", "kettlebell"],
     onboardingCompleted: true,
     targetWeightKg: null,
+    recoveryEnabled: false,
     createdAt: nowIso,
     updatedAt: nowIso,
   });

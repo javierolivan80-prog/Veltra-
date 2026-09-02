@@ -77,3 +77,14 @@ const MONTH_NAMES_ES = [
 export function todayFullLabel(date: Date = new Date()): string {
   return `${WEEKDAY_NAMES_ES[date.getDay()]} ${date.getDate()} de ${MONTH_NAMES_ES[date.getMonth()]}`;
 }
+
+/** Días naturales de `from` a `to`, ambos claves de día locales. Negativo si
+ *  `to` es anterior. Se redondea porque un cambio de hora mete ±1 h en la
+ *  resta y convertiría 30 días exactos en 29,96. */
+export function daysBetweenDayKeys(from: string, to: string): number {
+  const parse = (key: string) => {
+    const [y, m, d] = key.split("-").map(Number);
+    return new Date(y, m - 1, d).getTime();
+  };
+  return Math.round((parse(to) - parse(from)) / 86400000);
+}

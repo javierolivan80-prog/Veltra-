@@ -64,6 +64,9 @@ export interface Profile {
   onboardingCompleted: boolean;
   /** Optional goal weight shown as progress on the Peso page. */
   targetWeightKg: number | null;
+  /** Recuperación no está en la navegación: se activa aquí y entonces
+   *  aparece como bloque en Hoy. */
+  recoveryEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -485,4 +488,52 @@ export interface GoalCheckpoint {
   done: boolean;
   position: number;
   createdAt: string;
+}
+
+// ---------------------------------------------------------------------
+// El contrato — el arco de 30/60/90 días que el usuario firma al empezar.
+// Un contrato activo por usuario; sus compromisos son lo que arma el plan
+// diario de Hoy.
+// ---------------------------------------------------------------------
+
+/** Lo que el usuario dice que quiere cambiar. Ordena el catálogo de
+ *  compromisos del paso 2; no restringe lo que puede elegir. */
+export type ContractFocus = "body" | "mind" | "recovery" | "routine";
+
+export type ContractStatus = "active" | "completed" | "abandoned";
+
+export interface Contract {
+  id: string;
+  focus: ContractFocus;
+  /** Por qué lo hace, en sus palabras. Se le devuelve cuando lleva días fallando. */
+  why: string;
+  durationDays: number; // 30 | 60 | 90
+  startedOn: string; // local day key (YYYY-MM-DD)
+  endsOn: string; // local day key (YYYY-MM-DD)
+  status: ContractStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+/** Tipo de bloque en Hoy. Cada compromiso se resuelve en uno de los módulos
+ *  que ya existen; no hay compromisos sin sitio donde registrarse. */
+export type CommitmentKind = "workout" | "sleep" | "nutrition" | "meditation" | "journaling" | "focus" | "habit";
+
+/** Franja, no hora exacta: prometer las 07:30 cuando nadie la ha configurado
+ *  es lo que hacía que Hoy dijera "ahora: entrenamiento" a las 23:00. */
+export type TimeSlot = "morning" | "afternoon" | "evening";
+
+export interface Commitment {
+  id: string;
+  contractId: string;
+  kind: CommitmentKind;
+  title: string;
+  /** Días de la semana en convención JS (0 = domingo … 6 = sábado). Su
+   *  longitud *es* la frecuencia: "4 veces por semana" son 4 días marcados,
+   *  así que no puede contradecirse con un campo aparte. */
+  days: number[];
+  timeSlot: TimeSlot;
+  position: number;
+  createdAt: string;
+  updatedAt: string;
 }

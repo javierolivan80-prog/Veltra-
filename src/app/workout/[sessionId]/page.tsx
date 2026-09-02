@@ -123,6 +123,12 @@ export default function ActiveWorkoutPage() {
 
   const elapsed = useElapsed(session?.startedAt);
 
+  // Belt-and-suspenders guard alongside addSet.isPending: closes the brief gap
+  // before React re-renders the disabled button, so a fast double-tap can
+  // never fire this twice. Declared before the early return below so every
+  // render calls the same hooks in the same order.
+  const isLoggingSet = useRef(false);
+
   if (!session || !sessionId) return null;
 
   const addExerciseOnTheFly = (exercise: Exercise) => {
@@ -134,11 +140,6 @@ export default function ActiveWorkoutPage() {
     setExtra((e) => [...e, { exerciseId: exercise.id, name: exercise.name, targetSets: 3, targetRepsMin: 8, targetRepsMax: 12, restSeconds: 90 }]);
     setCurrentIndex(exerciseList.length);
   };
-
-  // Belt-and-suspenders guard alongside addSet.isPending: closes the brief gap
-  // before React re-renders the disabled button, so a fast double-tap can
-  // never fire this twice.
-  const isLoggingSet = useRef(false);
 
   const logSet = async () => {
     if (!current || isLoggingSet.current) return;

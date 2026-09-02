@@ -19,9 +19,13 @@ import { useBodyWeightLogs, useProfile } from "@/features/profile/hooks";
 import { sleptMinutes } from "@/features/sleep/calc";
 import { useSleepLogs } from "@/features/sleep/hooks";
 import { useAllSets, useCurrentStreak, useSetsForExercise } from "@/features/workouts/hooks";
+import Link from "next/link";
+import { dayOfArc, daysLeft } from "@/features/contract/arc";
+import { FOCUS_OPTIONS } from "@/features/contract/catalogue";
+import { useActiveContract, useContracts } from "@/features/contract/hooks";
 import { cn } from "@/lib/cn";
 import { formatHoursMinutes } from "@/lib/duration";
-import { formatWeight } from "@/lib/format";
+import { formatDateLong, formatWeight } from "@/lib/format";
 import type { Exercise, SetEntry } from "@/types/models";
 
 const METRIC_COLOR: Record<ProgressMetric, string> = {
@@ -58,6 +62,8 @@ export default function ProgressPage() {
   const { data: exercises = [] } = useExercises();
   const recentPRsQuery = useRecentPRs(1);
   const { data: profile } = useProfile();
+  const { data: contract } = useActiveContract();
+  const { data: contracts = [] } = useContracts();
   const { data: allSets = [] } = useAllSets();
   const { data: allMeals = [] } = useAllFoodMeals();
   const { data: allSleepLogs = [] } = useSleepLogs();
@@ -142,21 +148,54 @@ export default function ProgressPage() {
     return rows.sort((a, b) => b.setCount - a.setCount).slice(0, 6);
   }, [allSets, exercises, profile]);
 
-  if (exercises.length === 0) {
-    return (
-      <div className="flex flex-col gap-6">
-        <h1 className="text-ink text-2xl font-display">Progreso</h1>
-        <Card raised>
-          <EmptyState title="Aún no hay ejercicios" description="Registra algún entrenamiento y aquí podrás analizar la evolución de cada ejercicio." />
-        </Card>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-ink font-display font-semibold text-[22px] leading-tight">Cuerpo</h1>
+      <h1 className="text-ink font-display font-semibold text-[26px] leading-tight tracking-tight">Progreso</h1>
+
+      {contract ? (
+        <Link href="/contract" className="block border border-line-subtle rounded-2xl bg-surface px-4 py-4 hover:border-line transition-colors">
+          <div className="flex items-baseline justify-between gap-2">
+            <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em]">Tu arco</p>
+            <ChevronRight size={16} className="text-ink-faint shrink-0" />
+          </div>
+          <p className="text-ink font-display font-semibold text-[22px] mt-2">
+            Día {dayOfArc(contract)} <span className="text-ink-faint text-sm font-medium">de {contract.durationDays}</span>
+          </p>
+          <div className="h-[3px] bg-[#1B1B1E] rounded-full mt-3">
+            <div
+              className="h-[3px] bg-progress rounded-full transition-all"
+              style={{ width: `${Math.round((dayOfArc(contract) / contract.durationDays) * 100)}%` }}
+            />
+          </div>
+          <p className="text-ink-dim text-xs mt-2.5">
+            {FOCUS_OPTIONS.find((f) => f.value === contract.focus)?.title} · quedan {daysLeft(contract)} días
+          </p>
+        </Link>
+      ) : null}
+
+      {contracts.filter((c) => c.status !== "active").length > 0 ? (
+        <div>
+          <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em] mb-2.5">Arcos anteriores</p>
+          <div className="flex flex-col gap-2">
+            {contracts
+              .filter((c) => c.status !== "active")
+              .map((c) => (
+                <div key={c.id} className="border border-line-subtle rounded-lg bg-[#0E0E0E] px-3.5 py-3 flex items-center justify-between gap-3">
+                  <div className="min-w-0">
+                    <p className="text-ink text-sm font-semibold truncate">{FOCUS_OPTIONS.find((f) => f.value === c.focus)?.title}</p>
+                    <p className="text-ink-faint text-xs mt-0.5">
+                      {c.durationDays} días · empezado el {formatDateLong(c.startedOn)}
+                    </p>
+                  </div>
+                  <span className="text-ink-faint text-xs shrink-0">{c.status === "completed" ? "Completado" : "Terminado antes"}</span>
+                </div>
+              ))}
+          </div>
+        </div>
+      ) : null}
+
+      <div className="flex items-center justify-between border-t border-line-subtle pt-5">
+        <h2 className="text-ink font-display font-semibold text-[20px] leading-tight">Entrenamiento</h2>
         {streak > 0 ? (
           <div className="flex items-center gap-1.5 px-2.5 py-1.5 border border-line rounded-full">
             <Flame size={14} className="text-record" />
@@ -164,6 +203,12 @@ export default function ProgressPage() {
           </div>
         ) : null}
       </div>
+
+      {exercises.length === 0 ? (
+        <Card raised>
+          <EmptyState title="Aún no hay ejercicios" description="Registra algún entrenamiento y aquí podrás analizar la evolución de cada ejercicio." />
+        </Card>
+      ) : null}
 
       <SegmentedControl value={statsWindow} onChange={setStatsWindow} options={STATS_WINDOWS.map((w) => ({ value: w.value, label: w.label }))} />
 

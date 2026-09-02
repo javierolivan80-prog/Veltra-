@@ -6,6 +6,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Logo } from "@/design-system/components/Logo";
+import { useActiveContract } from "@/features/contract/hooks";
 import { useProfile } from "@/features/profile/hooks";
 import { isOnboarded } from "@/features/profile/repo";
 
@@ -38,12 +39,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   // onboarding ever ran — guard every authenticated route the same way the
   // root gate does.
   const { data: profile, isLoading } = useProfile();
+  // Y sin contrato firmado tampoco se entra: el plan del día no existe hasta
+  // que hay compromisos que lo llenen.
+  const { data: contract, isLoading: contractLoading } = useActiveContract();
+  const profileReady = !isLoading && isOnboarded(profile);
 
   useEffect(() => {
-    if (!isLoading && !isOnboarded(profile)) router.replace("/onboarding");
-  }, [isLoading, profile, router]);
+    if (isLoading) return;
+    if (!isOnboarded(profile)) {
+      router.replace("/onboarding");
+      return;
+    }
+    if (!contractLoading && !contract) router.replace("/onboarding/contract");
+  }, [isLoading, profile, contractLoading, contract, router]);
 
-  if (isLoading || !isOnboarded(profile)) return null;
+  if (!profileReady || contractLoading || !contract) return null;
 
   return (
     <div className="min-h-screen bg-bg md:flex">

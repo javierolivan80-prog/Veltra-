@@ -66,6 +66,9 @@ export function getDb(): Promise<IDBPDatabase<VeltraDB>> {
           db.createObjectStore("goals", { keyPath: "id" });
           db.createObjectStore("goalCheckpoints", { keyPath: "id" }).createIndex("goalId", "goalId");
         }
+        if (oldVersion < 6) {
+          db.createObjectStore("dailyMoods", { keyPath: "id" }).createIndex("date", "date");
+        }
       },
     }).then(async (db) => {
       await seedExerciseLibrary(db);

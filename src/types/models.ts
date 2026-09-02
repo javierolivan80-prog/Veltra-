@@ -406,6 +406,22 @@ export interface JournalEntry {
 }
 
 // ---------------------------------------------------------------------
+// Mente — registro rápido de ánimo del día ("¿Cómo estás hoy?").
+// Separate from JournalEntry.mood (1-10, tied to a written entry) — this is
+// a one-tap daily check-in with no writing required.
+// ---------------------------------------------------------------------
+
+export type MoodOption = "low" | "flat" | "good" | "focused";
+
+export interface DailyMood {
+  id: string;
+  date: string;
+  mood: MoodOption;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------
 // Mente — Foco (Pomodoro): una fila por bloque de trabajo completado.
 // ---------------------------------------------------------------------
 

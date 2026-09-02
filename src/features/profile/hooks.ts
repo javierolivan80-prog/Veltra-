@@ -65,6 +65,14 @@ export function useAddBodyWeightLog() {
   });
 }
 
+export function useSetRecoveryEnabled() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) => repo.setRecoveryEnabled(enabled),
+    onSuccess: () => qc.invalidateQueries({ queryKey: profileKeys.profile }),
+  });
+}
+
 export function useUpdateTargetWeight() {
   const qc = useQueryClient();
   return useMutation({

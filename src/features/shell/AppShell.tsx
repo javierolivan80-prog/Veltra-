@@ -1,29 +1,29 @@
 "use client";
 
-import { Brain, Dumbbell, Home, ShieldAlert, Target, User } from "lucide-react";
+import { Home, TrendingUp, User } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
 import { cn } from "@/lib/cn";
 import { Logo } from "@/design-system/components/Logo";
+import { useActiveContract } from "@/features/contract/hooks";
 import { useProfile } from "@/features/profile/hooks";
 import { isOnboarded } from "@/features/profile/repo";
 
+/** Tres destinos: el plan de hoy, lo que la app devuelve, y los ajustes.
+ *  Los módulos dejan de ser destinos y pasan a ser bloques dentro de Hoy. */
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Hoy", icon: Home, activeColor: "text-progress" },
-  { href: "/body", label: "Cuerpo", icon: Dumbbell, activeColor: "text-info" },
-  { href: "/mind", label: "Mente", icon: Brain, activeColor: "text-progress" },
-  { href: "/recovery", label: "Recuperación", icon: ShieldAlert, activeColor: "text-addiction" },
-  { href: "/life", label: "Vida", icon: Target, activeColor: "text-record" },
+  { href: "/progress", label: "Progreso", icon: TrendingUp, activeColor: "text-progress" },
+  { href: "/profile", label: "Perfil", icon: User, activeColor: "text-progress" },
 ];
 
-/** Module routes that belong to each category tab, so it stays highlighted
- *  when you're two levels deep (e.g. /sleep highlights "Cuerpo"). */
+/** Rutas de módulo que cuelgan de cada destino, para que la pestaña siga
+ *  marcada cuando estás dos niveles dentro (p. ej. /sleep marca "Hoy"). */
 const CATEGORY_CHILDREN: Record<string, string[]> = {
-  "/body": ["/routines", "/progress", "/history", "/workout", "/exercises", "/sleep", "/food", "/weight"],
-  "/mind": ["/habits", "/meditation", "/journal", "/focus"],
-  "/recovery": ["/addictions", "/screen-time"],
-  "/life": ["/finances", "/goals"],
+  "/dashboard": ["/routines", "/workout", "/exercises", "/sleep", "/food", "/habits", "/meditation", "/journal", "/focus", "/addictions"],
+  "/progress": ["/history", "/weight"],
+  "/profile": ["/contract"],
 };
 
 function isActive(pathname: string, href: string): boolean {
@@ -38,12 +38,21 @@ export function AppShell({ children }: { children: ReactNode }) {
   // onboarding ever ran — guard every authenticated route the same way the
   // root gate does.
   const { data: profile, isLoading } = useProfile();
+  // Y sin contrato firmado tampoco se entra: el plan del día no existe hasta
+  // que hay compromisos que lo llenen.
+  const { data: contract, isLoading: contractLoading } = useActiveContract();
+  const profileReady = !isLoading && isOnboarded(profile);
 
   useEffect(() => {
-    if (!isLoading && !isOnboarded(profile)) router.replace("/onboarding");
-  }, [isLoading, profile, router]);
+    if (isLoading) return;
+    if (!isOnboarded(profile)) {
+      router.replace("/onboarding");
+      return;
+    }
+    if (!contractLoading && !contract) router.replace("/onboarding/contract");
+  }, [isLoading, profile, contractLoading, contract, router]);
 
-  if (isLoading || !isOnboarded(profile)) return null;
+  if (!profileReady || contractLoading || !contract) return null;
 
   return (
     <div className="min-h-screen bg-bg md:flex">
@@ -71,16 +80,6 @@ export function AppShell({ children }: { children: ReactNode }) {
             );
           })}
         </nav>
-        <Link
-          href="/profile"
-          className={cn(
-            "flex items-center gap-3 px-3.5 py-3 rounded-2xl text-sm font-semibold transition-colors",
-            isActive(pathname, "/profile") ? "bg-surface-raised text-ink" : "text-ink-dim hover:text-ink hover:bg-surface"
-          )}
-        >
-          <User size={18} />
-          Perfil
-        </Link>
       </aside>
 
       {/* Main content */}

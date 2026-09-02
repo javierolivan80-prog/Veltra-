@@ -36,7 +36,7 @@ function OnboardingContent() {
   useEffect(() => {
     getProfile()
       .then((profile) => {
-        if (isOnboarded(profile)) router.replace("/dashboard");
+        if (isOnboarded(profile)) router.replace("/onboarding/contract");
       })
       .catch(() => {});
   }, [router]);
@@ -45,7 +45,7 @@ function OnboardingContent() {
   // the account already has a completed profile.
   const handleAccountDone = async () => {
     const profile = await getProfile().catch(() => null);
-    if (isOnboarded(profile)) router.replace("/dashboard");
+    if (isOnboarded(profile)) router.replace("/onboarding/contract");
     else setStep("profile");
   };
 
@@ -78,7 +78,9 @@ function OnboardingContent() {
       if (values.injuryArea.trim()) {
         await addInjury(values.injuryArea.trim(), values.injuryNote.trim());
       }
-      router.replace("/dashboard");
+      // Al contrato, no a Hoy: el muro le mandaría igualmente, pero pasando
+      // por una pantalla que aún no tiene plan que enseñar.
+      router.replace("/onboarding/contract");
     } catch (err) {
       setProfileError(err instanceof Error ? err.message : "No se pudo guardar tu perfil. Inténtalo de nuevo.");
       setSubmitting(false);

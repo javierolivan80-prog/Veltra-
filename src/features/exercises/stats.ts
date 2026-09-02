@@ -54,16 +54,6 @@ export function weightSeries(sets: SetEntry[]): SessionPoint[] {
   return sortByDate(points);
 }
 
-export function volumeSeries(sets: SetEntry[], exercise: Pick<Exercise, "equipment">, bodyweightKg: number | null): SessionPoint[] {
-  const grouped = groupBySession(sets);
-  const points: SessionPoint[] = [];
-  for (const [sessionId, sessionSets] of grouped) {
-    const total = sessionSets.reduce((sum, s) => sum + effectiveWeight(exercise, s.weightKg, bodyweightKg) * s.reps, 0);
-    points.push({ sessionId, date: sessionSets[0].completedAt, value: total });
-  }
-  return sortByDate(points);
-}
-
 export function oneRmSeries(sets: SetEntry[], exercise: Pick<Exercise, "equipment">, bodyweightKg: number | null): SessionPoint[] {
   const grouped = groupBySession(sets);
   const points: SessionPoint[] = [];
@@ -90,12 +80,6 @@ export function weeklyFrequency(sets: SetEntry[], weeks = 12): number {
   const sessionDates = [...grouped.values()].map((s) => new Date(s[0].completedAt).getTime()).filter((t) => t >= cutoff);
   if (sessionDates.length === 0) return 0;
   return Math.round((sessionDates.length / weeks) * 10) / 10;
-}
-
-export function bestSession(sets: SetEntry[], exercise: Pick<Exercise, "equipment">, bodyweightKg: number | null) {
-  const vol = volumeSeries(sets, exercise, bodyweightKg);
-  if (vol.length === 0) return null;
-  return vol.reduce((best, p) => (p.value > best.value ? p : best), vol[0]);
 }
 
 /** Naive least-squares trend, projected `periodsAhead` sessions into the future. Used for the "predicted progress" line. */

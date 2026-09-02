@@ -7,7 +7,7 @@ import { formatDuration } from "@/lib/format";
 import { useWorkoutSessionStore } from "@/state/workoutSession.store";
 import { ProgressRing } from "./ProgressRing";
 
-export function RestTimer() {
+export function RestTimer({ sessionId }: { sessionId: string }) {
   const restTimer = useWorkoutSessionStore((s) => s.restTimer);
   const clearRest = useWorkoutSessionStore((s) => s.clearRest);
   const [now, setNow] = useState(() => Date.now());
@@ -17,21 +17,25 @@ export function RestTimer() {
   // Guards against the alert firing twice if the effect re-runs on the same rest.
   const alertedFor = useRef<number | null>(null);
 
-  useEffect(() => {
-    if (!restTimer.endsAt) return;
-    const interval = setInterval(() => setNow(Date.now()), 250);
-    return () => clearInterval(interval);
-  }, [restTimer.endsAt]);
+  // Ignore a rest timer left over from a different session (e.g. one that was
+  // never cleared before the app closed) — it belongs to a different session.
+  const endsAt = restTimer.sessionId === sessionId ? restTimer.endsAt : null;
 
   useEffect(() => {
-    if (restTimer.endsAt && restTimer.endsAt <= now) {
-      if (alertedFor.current !== restTimer.endsAt) {
-        alertedFor.current = restTimer.endsAt;
+    if (!endsAt) return;
+    const interval = setInterval(() => setNow(Date.now()), 250);
+    return () => clearInterval(interval);
+  }, [endsAt]);
+
+  useEffect(() => {
+    if (endsAt && endsAt <= now) {
+      if (alertedFor.current !== endsAt) {
+        alertedFor.current = endsAt;
         playRestFinishedAlert();
       }
       clearRest();
     }
-  }, [now, restTimer.endsAt, clearRest]);
+  }, [now, endsAt, clearRest]);
 
   const toggleMute = () => {
     const next = !muted;
@@ -39,9 +43,9 @@ export function RestTimer() {
     setAlertMuted(next);
   };
 
-  if (!restTimer.endsAt) return null;
+  if (!endsAt) return null;
 
-  const remainingMs = Math.max(0, restTimer.endsAt - now);
+  const remainingMs = Math.max(0, endsAt - now);
   const remainingSec = Math.ceil(remainingMs / 1000);
   const progress = restTimer.durationSeconds > 0 ? remainingMs / 1000 / restTimer.durationSeconds : 0;
 

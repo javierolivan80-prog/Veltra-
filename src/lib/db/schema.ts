@@ -5,6 +5,7 @@ import type {
   BodyWeightLog,
   CoachMessage,
   Conversation,
+  DailyMood,
   Exercise,
   Expense,
   FinanceGoals,
@@ -36,7 +37,7 @@ import type {
 } from "@/types/models";
 
 export const DB_NAME = "veltra";
-export const DB_VERSION = 5;
+export const DB_VERSION = 6;
 
 /** Single-row store for the local nutrition goals — mirrors the per-user Supabase row. */
 export type StoredNutritionGoals = NutritionGoals & { id: string };
@@ -88,6 +89,7 @@ export interface VeltraDB extends DBSchema {
   financeGoals: { key: string; value: StoredFinanceGoals };
   goals: { key: string; value: LifeGoal };
   goalCheckpoints: { key: string; value: GoalCheckpoint; indexes: { goalId: string } };
+  dailyMoods: { key: string; value: DailyMood; indexes: { date: string } };
 }
 
 export const STORE_NAMES = [
@@ -124,4 +126,5 @@ export const STORE_NAMES = [
   "financeGoals",
   "goals",
   "goalCheckpoints",
+  "dailyMoods",
 ] as const;

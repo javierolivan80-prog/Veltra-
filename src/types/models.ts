@@ -141,7 +141,7 @@ export interface SetEntry {
   completedAt: string;
 }
 
-export type RecordType = "1rm" | "weight" | "volume" | "reps";
+export type RecordType = "1rm" | "weight" | "reps";
 
 export interface PersonalRecord {
   id: string;
@@ -401,6 +401,22 @@ export interface JournalEntry {
   gratitude: string;
   learned: string;
   mood: number | null; // 1-10
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Mente — registro rápido de ánimo del día ("¿Cómo estás hoy?").
+// Separate from JournalEntry.mood (1-10, tied to a written entry) — this is
+// a one-tap daily check-in with no writing required.
+// ---------------------------------------------------------------------
+
+export type MoodOption = "low" | "flat" | "good" | "focused";
+
+export interface DailyMood {
+  id: string;
+  date: string;
+  mood: MoodOption;
   createdAt: string;
   updatedAt: string;
 }

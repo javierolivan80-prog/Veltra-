@@ -83,6 +83,10 @@ export function useAddSet() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (input: AddSetInput) => repo.addSet(input),
+    // A couple of quick retries absorb the transient mobile-network blips
+    // that used to make this look like the button needed 2-3 taps to work.
+    retry: 2,
+    retryDelay: 1000,
     onSuccess: (_data, variables) => {
       qc.invalidateQueries({ queryKey: workoutKeys.sets(variables.sessionId) });
       qc.invalidateQueries({ queryKey: workoutKeys.lastSet(variables.exerciseId) });

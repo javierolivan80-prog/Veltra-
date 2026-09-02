@@ -52,7 +52,12 @@ export async function upsertSleepLog(input: SleepLogInput): Promise<SleepLog> {
   if (isSupabaseConfigured) {
     const supabase = getSupabaseBrowserClient()!;
     const userId = await requireUserId();
-    const { error } = await supabase.from("sleep_logs").upsert({ ...toSnakeCase(log), user_id: userId });
+    // onConflict targets the table's real unique key (one log per user per
+    // night) rather than the client-generated id: if the "existing" lookup
+    // above raced with another save (e.g. a fast double-tap) and missed a
+    // row that was just inserted, upserting by id alone would try to INSERT
+    // a second row and fail on the unique constraint instead of updating it.
+    const { error } = await supabase.from("sleep_logs").upsert({ ...toSnakeCase(log), user_id: userId }, { onConflict: "user_id,date" });
     if (error) throw error;
   } else {
     const db = await getDb();

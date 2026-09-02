@@ -2,7 +2,7 @@
 
 import { Check, Plus, Trash2, X } from "lucide-react";
 import { useParams, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PRCelebration } from "@/design-system/components/PRCelebration";
 import { RankUpCelebration } from "@/design-system/components/RankUpCelebration";
 import { RestTimer } from "@/design-system/components/RestTimer";
@@ -24,6 +24,7 @@ import {
 } from "@/features/workouts/hooks";
 import { primeAlerts } from "@/lib/alert";
 import { cn } from "@/lib/cn";
+import { errorMessage } from "@/lib/errors";
 import { formatDuration, formatWeight } from "@/lib/format";
 import { useWorkoutSessionStore } from "@/state/workoutSession.store";
 import type { Exercise, PersonalRecord, RankTier } from "@/types/models";
@@ -37,7 +38,7 @@ interface WorkoutExercise {
   restSeconds: number;
 }
 
-const PR_PRIORITY: PersonalRecord["type"][] = ["1rm", "weight", "volume", "reps"];
+const PR_PRIORITY: PersonalRecord["type"][] = ["1rm", "weight", "reps"];
 
 function useElapsed(startedAt?: string) {
   const [now, setNow] = useState(() => Date.now());
@@ -64,6 +65,7 @@ export default function ActiveWorkoutPage() {
   const deleteSet = useDeleteSet();
   const deleteExercise = useDeleteExerciseFromSession();
   const startRest = useWorkoutSessionStore((s) => s.startRest);
+  const clearRest = useWorkoutSessionStore((s) => s.clearRest);
 
   const [extra, setExtra] = useState<WorkoutExercise[]>([]);
   // Routine exercises the user dropped from *this* session only (the routine itself is untouched).
@@ -133,33 +135,48 @@ export default function ActiveWorkoutPage() {
     setCurrentIndex(exerciseList.length);
   };
 
+  // Belt-and-suspenders guard alongside addSet.isPending: closes the brief gap
+  // before React re-renders the disabled button, so a fast double-tap can
+  // never fire this twice.
+  const isLoggingSet = useRef(false);
+
   const logSet = async () => {
-    if (!current) return;
-    // Unlock audio here: iOS only allows sound from an AudioContext opened
-    // inside a user gesture, and this tap is what schedules the rest alert.
-    primeAlerts();
-    const result = await addSet.mutateAsync({ sessionId, exerciseId: current.exerciseId, weightKg, reps, rir, rpe });
-    startRest(current.restSeconds);
+    if (!current || isLoggingSet.current) return;
+    isLoggingSet.current = true;
+    try {
+      // Unlock audio here: iOS only allows sound from an AudioContext opened
+      // inside a user gesture, and this tap is what schedules the rest alert.
+      primeAlerts();
+      const result = await addSet.mutateAsync({ sessionId, exerciseId: current.exerciseId, weightKg, reps, rir, rpe });
+      startRest(sessionId, current.restSeconds);
 
-    const oneRmPr = result.prsBroken.find((p) => p.type === "1rm");
-    const exerciseFull = allExercises.find((e) => e.id === current.exerciseId);
-    if (oneRmPr && exerciseFull && profile?.bodyweightKg && isRankEligible(exerciseFull)) {
-      const rankInput = { exercise: exerciseFull, bodyweightKg: profile.bodyweightKg, sex: profile.sex, birthDate: profile.birthDate, experienceLevel: profile.experienceLevel };
-      const newRank = computeRank({ ...rankInput, oneRmKg: oneRmPr.value });
-      const oldRank = oneRmPr.previousValue ? computeRank({ ...rankInput, oneRmKg: oneRmPr.previousValue }) : null;
-      if (newRank && newRank.tier !== (oldRank?.tier ?? null)) {
-        setRankUp(newRank.tier);
-        return;
+      const oneRmPr = result.prsBroken.find((p) => p.type === "1rm");
+      const exerciseFull = allExercises.find((e) => e.id === current.exerciseId);
+      if (oneRmPr && exerciseFull && profile?.bodyweightKg && isRankEligible(exerciseFull)) {
+        const rankInput = { exercise: exerciseFull, bodyweightKg: profile.bodyweightKg, sex: profile.sex, birthDate: profile.birthDate, experienceLevel: profile.experienceLevel };
+        const newRank = computeRank({ ...rankInput, oneRmKg: oneRmPr.value });
+        const oldRank = oneRmPr.previousValue ? computeRank({ ...rankInput, oneRmKg: oneRmPr.previousValue }) : null;
+        if (newRank && newRank.tier !== (oldRank?.tier ?? null)) {
+          setRankUp(newRank.tier);
+          return;
+        }
       }
-    }
 
-    const best = PR_PRIORITY.map((t) => result.prsBroken.find((p) => p.type === t)).find(Boolean);
-    if (best) setCelebrating(best);
+      const best = PR_PRIORITY.map((t) => result.prsBroken.find((p) => p.type === t)).find(Boolean);
+      if (best) setCelebrating(best);
+    } catch (err) {
+      // Without this, a failed tap (auth/network hiccup, etc.) looked like the
+      // button did nothing at all, and the set was silently never logged.
+      alert(errorMessage(err, "No se pudo registrar la serie. Inténtalo de nuevo."));
+    } finally {
+      isLoggingSet.current = false;
+    }
   };
 
   const finish = async () => {
     if (!confirm("¿Terminar y guardar esta sesión?")) return;
     await endSession.mutateAsync({ id: sessionId, status: "completed" });
+    clearRest();
     router.replace("/dashboard");
   };
 
@@ -186,6 +203,7 @@ export default function ActiveWorkoutPage() {
   const cancel = async () => {
     if (!confirm("¿Cancelar este entrenamiento? Se borrará todo lo registrado en esta sesión y no contará en tu historial ni estadísticas.")) return;
     await deleteSession.mutateAsync(sessionId);
+    clearRest();
     router.replace("/dashboard");
   };
 
@@ -207,7 +225,7 @@ export default function ActiveWorkoutPage() {
           </div>
         </div>
 
-        <RestTimer />
+        <RestTimer sessionId={sessionId} />
 
         <div className="flex gap-2 overflow-x-auto no-scrollbar scroll-fade-x pb-5 pr-2">
           {exerciseList.map((ex, i) => {
@@ -298,7 +316,12 @@ export default function ActiveWorkoutPage() {
               </div>
             </div>
 
-            <button onClick={logSet} disabled={addSet.isPending} className="w-full bg-progress rounded-2xl py-5 text-bg-deep text-lg font-bold">
+            <button
+              onClick={logSet}
+              disabled={addSet.isPending}
+              className="w-full bg-progress rounded-2xl py-5 text-bg-deep text-lg font-bold disabled:opacity-60 flex items-center justify-center gap-2"
+            >
+              {addSet.isPending ? <span className="h-4 w-4 rounded-full border-2 border-current border-t-transparent animate-spin" /> : null}
               Registrar serie
             </button>
           </>

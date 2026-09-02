@@ -105,6 +105,7 @@ export async function seedDemoData(db: IDBPDatabase<VeltraDB>) {
     equipmentAvailable: ["barbell", "dumbbell", "machine", "cable", "bodyweight", "kettlebell"],
     onboardingCompleted: true,
     targetWeightKg: null,
+    recoveryEnabled: false,
     createdAt: nowIso,
     updatedAt: nowIso,
   });

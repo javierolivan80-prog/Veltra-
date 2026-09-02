@@ -64,6 +64,9 @@ export interface Profile {
   onboardingCompleted: boolean;
   /** Optional goal weight shown as progress on the Peso page. */
   targetWeightKg: number | null;
+  /** Recuperación no está en la navegación: se activa aquí y entonces
+   *  aparece como bloque en Hoy. */
+  recoveryEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }

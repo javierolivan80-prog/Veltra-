@@ -4,13 +4,17 @@ import { Book, Brain, Check, Dumbbell, Moon, Play, Target, UtensilsCrossed, type
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
+import { ShieldAlert } from "lucide-react";
 import { commitmentsForDay } from "@/features/contract/arc";
 import { KIND_HREF, SLOT_LABEL, SLOT_ORDER } from "@/features/contract/catalogue";
 import { useActiveContract, useCommitments } from "@/features/contract/hooks";
 import { useFocusSessions } from "@/features/focus/hooks";
 import { useDailyNutrition } from "@/features/food/hooks";
 import { useJournalEntryByDate } from "@/features/journaling/hooks";
+import { useAddictions, useAllRelapses } from "@/features/addictions/hooks";
+import { currentStreakStartMs } from "@/features/addictions/stats";
 import { useMeditationSessions } from "@/features/meditation/hooks";
+import { useProfile } from "@/features/profile/hooks";
 import { useRoutines } from "@/features/routines/hooks";
 import { sleptMinutes } from "@/features/sleep/calc";
 import { useSleepLogByDate } from "@/features/sleep/hooks";
@@ -79,6 +83,9 @@ export default function DashboardPage() {
   const { data: todayJournal } = useJournalEntryByDate(today);
   const { data: focusSessions = [] } = useFocusSessions();
   const { data: nutrition } = useDailyNutrition(today);
+  const { data: profile } = useProfile();
+  const { data: addictions = [] } = useAddictions();
+  const { data: allRelapses = [] } = useAllRelapses();
 
   const suggestedRoutine = useMemo(() => {
     if (routines.length === 0) return null;
@@ -98,6 +105,16 @@ export default function DashboardPage() {
   const ateToday = (nutrition?.mealCount ?? 0) > 0;
 
   const todaysCommitments = useMemo(() => commitmentsForDay(commitments, today), [commitments, today]);
+
+  // Recuperación no es un compromiso del contrato: es una cuenta que corre
+  // sola. Solo aparece si el usuario la ha activado en Perfil.
+  const cleanDays = useMemo(() => {
+    if (!profile?.recoveryEnabled || addictions.length === 0) return null;
+    const days = addictions.map((a) =>
+      Math.floor((Date.now() - currentStreakStartMs(a, allRelapses.filter((r) => r.addictionId === a.id))) / 86400000)
+    );
+    return Math.max(...days);
+  }, [profile?.recoveryEnabled, addictions, allRelapses]);
 
   const handleStart = async () => {
     if (activeSession) {
@@ -262,6 +279,21 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+
+      {cleanDays !== null ? (
+        <Link
+          href="/addictions"
+          className="flex items-center gap-3 border border-line-subtle rounded-[14px] bg-[#0E0E0E] p-4 hover:border-line transition-colors"
+        >
+          <ShieldAlert size={16} className="text-addiction shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-ink text-[15px] font-display font-semibold">
+              {cleanDays} {cleanDays === 1 ? "día" : "días"}
+            </p>
+            <p className="text-ink-faint text-xs mt-0.5">sin recaer</p>
+          </div>
+        </Link>
+      ) : null}
     </div>
   );
 }

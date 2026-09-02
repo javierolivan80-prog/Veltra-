@@ -29,11 +29,12 @@ export function RelapseDialog({ open, onOpenChange, addictionId }: { open: boole
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange} title="Registrar caída">
+    <Dialog open={open} onOpenChange={onOpenChange} title="Registrar una recaída">
       <div className="flex flex-col gap-4">
+        <p className="text-ink-dim text-sm leading-5">El contador vuelve a empezar, pero los días que llevabas siguen contando: están en tu historial.</p>
         <TextField label="Fecha y hora" type="datetime-local" value={fallenAt} onChange={(e) => setFallenAt(e.target.value)} />
-        <TextAreaField label="Razón por la que caíste (opcional)" placeholder="Para reflexionar…" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
-        <Button label="Guardar y reiniciar contador" onClick={save} variant="danger" loading={registerRelapse.isPending} fullWidth />
+        <TextAreaField label="¿Qué pasó? (opcional)" placeholder="Para ti, si te sirve entenderlo…" rows={3} value={reason} onChange={(e) => setReason(e.target.value)} />
+        <Button label="Guardar" onClick={save} variant="secondary" loading={registerRelapse.isPending} fullWidth />
       </div>
     </Dialog>
   );

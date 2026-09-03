@@ -3,7 +3,7 @@
 import { Book, Brain, Check, Dumbbell, Moon, Play, Target, UtensilsCrossed, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { commitmentsForDay, dayOfArc } from "@/features/contract/arc";
 import { KIND_HREF, SLOT_LABEL, SLOT_ORDER } from "@/features/contract/catalogue";
@@ -71,6 +71,7 @@ interface DayItem {
 export default function DashboardPage() {
   const router = useRouter();
   const today = todayKey();
+  const [nowMs] = useState(() => Date.now());
   const { data: contract } = useActiveContract();
   const { data: commitments = [] } = useCommitments(contract?.id ?? null);
   const { data: routines = [] } = useRoutines();
@@ -113,29 +114,29 @@ export default function DashboardPage() {
   // en vez de un "Sin registrar" sin contenido. Si tampoco hay nada en esa
   // ventana, el agregado es null y la tarjeta se queda en el estado simple.
   const sleepAvg7dMin = useMemo(() => {
-    const cutoff = Date.now() - 7 * 86400000;
+    const cutoff = nowMs - 7 * 86400000;
     const inWindow = allSleepLogs.filter((l) => new Date(l.date).getTime() >= cutoff);
     if (inWindow.length === 0) return null;
     return Math.round(inWindow.reduce((s, l) => s + sleptMinutes(l), 0) / inWindow.length);
-  }, [allSleepLogs]);
+  }, [allSleepLogs, nowMs]);
 
   const meditation7dMin = useMemo(() => {
-    const cutoff = Date.now() - 7 * 86400000;
+    const cutoff = nowMs - 7 * 86400000;
     const total = meditationSessions.filter((s) => new Date(s.completedAt).getTime() >= cutoff).reduce((sum, s) => sum + s.durationMinutes, 0);
     return total > 0 ? total : null;
-  }, [meditationSessions]);
+  }, [meditationSessions, nowMs]);
 
   const focus7dMin = useMemo(() => {
-    const cutoff = Date.now() - 7 * 86400000;
+    const cutoff = nowMs - 7 * 86400000;
     const total = focusSessions.filter((s) => new Date(s.completedAt).getTime() >= cutoff).reduce((sum, s) => sum + s.durationMinutes, 0);
     return total > 0 ? total : null;
-  }, [focusSessions]);
+  }, [focusSessions, nowMs]);
 
   const journal7dCount = useMemo(() => {
-    const cutoff = Date.now() - 7 * 86400000;
-    const count = allJournalEntries.filter((e) => new Date(e.createdAt).getTime() >= cutoff).length;
+    const cutoff = nowMs - 7 * 86400000;
+    const count = allJournalEntries.filter((e) => new Date(e.date).getTime() >= cutoff).length;
     return count > 0 ? count : null;
-  }, [allJournalEntries]);
+  }, [allJournalEntries, nowMs]);
 
   // Recuperación no es un compromiso del contrato: es una cuenta que corre
   // sola. Solo aparece si el usuario la ha activado en Perfil.

@@ -537,3 +537,35 @@ export interface Commitment {
   createdAt: string;
   updatedAt: string;
 }
+
+// ---------------------------------------------------------------------
+// Revisión semanal — cada domingo, un resumen de la semana, un patrón si
+// hay datos para afirmarlo, y como mucho una propuesta de cambio al plan.
+// ---------------------------------------------------------------------
+
+export type ReviewProposalStatus = "pending" | "accepted" | "kept" | "none";
+export type ReviewGeneratedBy = "ai" | "rules";
+
+/** El único cambio concreto que una revisión puede proponer: la frecuencia
+ *  o la franja de un compromiso. Nunca más de una propuesta por revisión. */
+export interface ReviewProposal {
+  commitmentId: string;
+  title: string;
+  currentDays: number[];
+  proposedDays: number[];
+  proposedTimeSlot: TimeSlot;
+  reason: string;
+}
+
+export interface WeeklyReview {
+  id: string;
+  contractId: string;
+  /** Day-key (YYYY-MM-DD) del primer día de la semana revisada. */
+  weekStart: string;
+  summary: string;
+  pattern: string | null;
+  proposal: ReviewProposal | null;
+  proposalStatus: ReviewProposalStatus;
+  generatedBy: ReviewGeneratedBy;
+  createdAt: string;
+}

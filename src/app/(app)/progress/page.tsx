@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronDown, ChevronRight, Flame, LineChart as LineChartIcon } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, Flame, LineChart as LineChartIcon, Sparkles } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Card } from "@/design-system/components/Card";
 import { Chip } from "@/design-system/components/Chip";
@@ -15,18 +15,25 @@ import { analyzeProgress, METRIC_UNIT, TIMEFRAMES, type ProgressMetric, type Pro
 import { computeRank, isRankEligible, RANK_META } from "@/features/exercises/ranks";
 import { oneRmSeries, weightSeries } from "@/features/exercises/stats";
 import { useAllFoodMeals } from "@/features/food/hooks";
+import { useFocusSessions } from "@/features/focus/hooks";
+import { useJournalEntries } from "@/features/journaling/hooks";
+import { useMeditationSessions } from "@/features/meditation/hooks";
 import { useBodyWeightLogs, useProfile } from "@/features/profile/hooks";
 import { sleptMinutes } from "@/features/sleep/calc";
 import { useSleepLogs } from "@/features/sleep/hooks";
-import { useAllSets, useCurrentStreak, useSetsForExercise } from "@/features/workouts/hooks";
+import { useAllSets, useCurrentStreak, useRecentSessions, useSetsForExercise } from "@/features/workouts/hooks";
 import Link from "next/link";
 import { dayOfArc, daysLeft } from "@/features/contract/arc";
 import { FOCUS_OPTIONS } from "@/features/contract/catalogue";
-import { useActiveContract, useContracts } from "@/features/contract/hooks";
+import { useActiveContract, useCommitments, useContracts } from "@/features/contract/hooks";
+import type { DoneDaysByKind } from "@/features/review/aggregate";
+import { currentReviewWeekStart } from "@/features/review/aggregate";
+import { useAcceptProposal, useEnsureLocalWeeklyReview, useKeepProposal, useReviews } from "@/features/review/hooks";
 import { cn } from "@/lib/cn";
 import { formatHoursMinutes } from "@/lib/duration";
 import { formatDateLong, formatWeight } from "@/lib/format";
-import type { Exercise, SetEntry } from "@/types/models";
+import { shiftDayKey } from "@/lib/date";
+import type { Exercise, SetEntry, WeeklyReview } from "@/types/models";
 
 const METRIC_COLOR: Record<ProgressMetric, string> = {
   weight: "#2ce6a0",
@@ -58,6 +65,49 @@ interface ExerciseRow {
   setCount: number;
 }
 
+/** Estructura fija: párrafo con números reales, un patrón (o su ausencia
+ *  dicha con todas las letras), y como mucho una propuesta con aceptar o
+ *  mantener. El morado es exclusivo de IA en esta app — esta es la única
+ *  pantalla donde aparece. */
+function WeeklyReviewCard({ review, onAccept, onKeep, pending }: { review: WeeklyReview; onAccept: () => void; onKeep: () => void; pending: boolean }) {
+  const showActions = review.proposal !== null && review.proposalStatus === "pending";
+  return (
+    <div className="rounded-2xl border border-ai/30 bg-ai-bg px-4 py-4">
+      <div className="flex items-center gap-2">
+        <Sparkles size={15} className="text-ai shrink-0" />
+        <p className="text-ai text-[11px] font-bold uppercase tracking-[.14em]">Revisión semanal</p>
+      </div>
+      <p className="text-ink text-sm mt-2.5 leading-5">{review.summary}</p>
+      <p className="text-ink-dim text-sm mt-2 leading-5">{review.pattern ?? "Necesitas más semanas de datos para ver un patrón."}</p>
+
+      {review.proposal ? (
+        <div className="mt-3.5 border-t border-ai/20 pt-3.5">
+          <p className="text-ink text-sm leading-5">{review.proposal.reason}</p>
+          {showActions ? (
+            <div className="flex items-center gap-2 mt-3">
+              <button
+                onClick={onAccept}
+                disabled={pending}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-ai text-bg-deep font-semibold text-sm py-2.5 rounded-xl disabled:opacity-50"
+              >
+                <Check size={14} />
+                Aceptar cambio
+              </button>
+              <button onClick={onKeep} disabled={pending} className="flex-1 border border-line text-ink-dim font-semibold text-sm py-2.5 rounded-xl disabled:opacity-50">
+                Mantener el plan
+              </button>
+            </div>
+          ) : review.proposalStatus === "accepted" ? (
+            <p className="text-progress text-xs mt-2.5 font-semibold">Cambio aplicado</p>
+          ) : (
+            <p className="text-ink-faint text-xs mt-2.5 font-semibold">Has mantenido el plan</p>
+          )}
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
 export default function ProgressPage() {
   const { data: exercises = [] } = useExercises();
   const recentPRsQuery = useRecentPRs(1);
@@ -69,6 +119,36 @@ export default function ProgressPage() {
   const { data: allSleepLogs = [] } = useSleepLogs();
   const { data: weightLogs = [] } = useBodyWeightLogs();
   const { data: streak = 0 } = useCurrentStreak();
+
+  const { data: commitments = [] } = useCommitments(contract?.id ?? null);
+  const { data: recentWorkoutSessions = [] } = useRecentSessions(60);
+  const { data: meditationSessions = [] } = useMeditationSessions();
+  const { data: focusSessions = [] } = useFocusSessions();
+  const { data: journalEntries = [] } = useJournalEntries();
+
+  // Lo que la revisión semanal necesita saber: qué días, por tipo de
+  // compromiso, hubo algo registrado. Un solo lugar donde se arma esta
+  // tabla — igual que "Hoy" resuelve cada compromiso contra el día de hoy,
+  // esto lo resuelve contra las últimas semanas.
+  const doneDaysByKind: DoneDaysByKind = useMemo(
+    () => ({
+      workout: new Set(recentWorkoutSessions.map((s) => s.startedAt.slice(0, 10))),
+      sleep: new Set(allSleepLogs.map((l) => l.date)),
+      nutrition: new Set(allMeals.map((m) => m.date)),
+      meditation: new Set(meditationSessions.map((s) => s.completedAt.slice(0, 10))),
+      focus: new Set(focusSessions.map((s) => s.completedAt.slice(0, 10))),
+      journaling: new Set(journalEntries.map((e) => e.date)),
+    }),
+    [recentWorkoutSessions, allSleepLogs, allMeals, meditationSessions, focusSessions, journalEntries]
+  );
+  useEnsureLocalWeeklyReview(contract, commitments, doneDaysByKind);
+  const { data: reviews = [] } = useReviews(contract?.id ?? null);
+  const currentWeekStart = currentReviewWeekStart();
+  const currentReview = reviews.find((r) => r.weekStart === currentWeekStart) ?? null;
+  const pastReviews = reviews.filter((r) => r.weekStart !== currentWeekStart);
+  const acceptProposal = useAcceptProposal();
+  const keepProposal = useKeepProposal();
+  const [reviewHistoryOpen, setReviewHistoryOpen] = useState(false);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [metric, setMetric] = useState<ProgressMetric>("weight");
@@ -171,6 +251,38 @@ export default function ProgressPage() {
             {FOCUS_OPTIONS.find((f) => f.value === contract.focus)?.title} · quedan {daysLeft(contract)} días
           </p>
         </Link>
+      ) : null}
+
+      {currentReview ? (
+        <WeeklyReviewCard
+          review={currentReview}
+          onAccept={() => acceptProposal.mutate(currentReview)}
+          onKeep={() => keepProposal.mutate(currentReview.id)}
+          pending={acceptProposal.isPending || keepProposal.isPending}
+        />
+      ) : null}
+
+      {pastReviews.length > 0 ? (
+        <div>
+          <button onClick={() => setReviewHistoryOpen((v) => !v)} className="flex items-center justify-between w-full">
+            <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em]">Revisiones anteriores · {pastReviews.length}</p>
+            <ChevronDown size={16} className={cn("text-ink-faint transition-transform", reviewHistoryOpen && "rotate-180")} />
+          </button>
+          {reviewHistoryOpen ? (
+            <div className="flex flex-col gap-2 mt-2.5">
+              {pastReviews.map((r) => (
+                <Card key={r.id} raised>
+                  <p className="text-ink-faint text-[11px] font-semibold uppercase tracking-wide">
+                    Semana del {formatDateLong(r.weekStart)} al {formatDateLong(shiftDayKey(r.weekStart, 6))}
+                  </p>
+                  <p className="text-ink text-sm mt-1.5 leading-5">{r.summary}</p>
+                  {r.proposalStatus === "accepted" ? <p className="text-progress text-xs mt-2 font-semibold">Propuesta aceptada</p> : null}
+                  {r.proposalStatus === "kept" ? <p className="text-ink-faint text-xs mt-2 font-semibold">Plan mantenido</p> : null}
+                </Card>
+              ))}
+            </div>
+          ) : null}
+        </div>
       ) : null}
 
       {contracts.filter((c) => c.status !== "active").length > 0 ? (

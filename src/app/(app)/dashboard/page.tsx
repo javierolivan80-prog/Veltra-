@@ -1,12 +1,13 @@
 "use client";
 
-import { Book, Brain, Check, Dumbbell, Moon, Play, Target, UtensilsCrossed, X, type LucideIcon } from "lucide-react";
+import { Book, Brain, Check, Cross, Dumbbell, Moon, Play, Target, UtensilsCrossed, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { useApplyAutoReductions, type DoneDaysByKind } from "@/features/contract/adaptive";
 import { commitmentsForDay, dayOfArc } from "@/features/contract/arc";
+import { useFaithCheckInByDate } from "@/features/faith/hooks";
 import { InstallPrompt } from "@/features/pwa/InstallPrompt";
 import { KIND_HREF, SLOT_LABEL, SLOT_ORDER } from "@/features/contract/catalogue";
 import { useActiveContract, useCommitments } from "@/features/contract/hooks";
@@ -126,6 +127,7 @@ export default function DashboardPage() {
   const { data: profile } = useProfile();
   const { data: addictions = [] } = useAddictions();
   const { data: allRelapses = [] } = useAllRelapses();
+  const { data: faithCheckIn } = useFaithCheckInByDate(today);
 
   const returning = useReturningAfterGap(today);
   const [dismissedMinimal, setDismissedMinimal] = useState(false);
@@ -217,6 +219,8 @@ export default function DashboardPage() {
     );
     return Math.max(...days);
   }, [profile?.recoveryEnabled, addictions, allRelapses]);
+
+  const faithDoneCount = (faithCheckIn?.mass ? 1 : 0) + (faithCheckIn?.rosary ? 1 : 0) + (faithCheckIn?.prayer ? 1 : 0) + (faithCheckIn?.examen ? 1 : 0);
 
   const handleStart = async () => {
     if (activeSession) {
@@ -458,6 +462,16 @@ export default function DashboardPage() {
               {cleanDays} {cleanDays === 1 ? "día" : "días"}
             </p>
             <p className="text-ink-faint text-xs mt-0.5">sin recaer</p>
+          </div>
+        </Link>
+      ) : null}
+
+      {profile?.faithEnabled ? (
+        <Link href="/faith" className="flex items-center gap-3 border border-line-subtle rounded-2xl bg-bg-soft p-4 hover:border-line transition-colors">
+          <Cross size={16} className="text-progress shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-ink text-[15px] font-display font-semibold">Fe</p>
+            <p className="text-ink-faint text-xs mt-0.5">{faithDoneCount} de 4 hoy</p>
           </div>
         </Link>
       ) : null}

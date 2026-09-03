@@ -67,6 +67,8 @@ export interface Profile {
   /** Recuperación no está en la navegación: se activa aquí y entonces
    *  aparece como bloque en Hoy. */
   recoveryEnabled: boolean;
+  /** Fe católica — mismo patrón que Recuperación: opcional, se activa aquí. */
+  faithEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -568,4 +570,21 @@ export interface WeeklyReview {
   proposalStatus: ReviewProposalStatus;
   generatedBy: ReviewGeneratedBy;
   createdAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Fe católica — un check-in por día, opcional (ver Profile.faithEnabled).
+// El examen de conciencia es texto libre y privado: sin categorías fijas
+// de faltas, cada uno lo escribe a su manera.
+// ---------------------------------------------------------------------
+
+export interface FaithCheckIn {
+  id: string;
+  date: string;
+  mass: boolean;
+  rosary: boolean;
+  prayer: boolean;
+  examen: string;
+  createdAt: string;
+  updatedAt: string;
 }

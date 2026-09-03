@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, ExternalLink, Scale, ShieldAlert, Trash2 } from "lucide-react";
+import { ChevronRight, Cross, ExternalLink, Scale, ShieldAlert, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Badge } from "@/design-system/components/Badge";
@@ -12,7 +12,7 @@ import { TextField } from "@/design-system/components/TextField";
 import { dayOfArc } from "@/features/contract/arc";
 import { useActiveContract } from "@/features/contract/hooks";
 import { EditProfileDialog } from "@/features/profile/EditProfileDialog";
-import { useAddInjury, useDeleteInjury, useInjuries, useProfile, useSetRecoveryEnabled, useToggleInjury } from "@/features/profile/hooks";
+import { useAddInjury, useDeleteInjury, useInjuries, useProfile, useSetFaithEnabled, useSetRecoveryEnabled, useToggleInjury } from "@/features/profile/hooks";
 import { useCurrentStreak, useRecentSessions } from "@/features/workouts/hooks";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { useAuthStore } from "@/state/auth.store";
@@ -28,6 +28,7 @@ export default function ProfilePage() {
   const { data: injuries = [] } = useInjuries();
   const { data: contract } = useActiveContract();
   const setRecoveryEnabled = useSetRecoveryEnabled();
+  const setFaithEnabled = useSetFaithEnabled();
   const addInjury = useAddInjury();
   const toggleInjury = useToggleInjury();
   const deleteInjury = useDeleteInjury();
@@ -230,6 +231,43 @@ export default function ProfilePage() {
                   </a>
                 </div>
               </div>
+            </div>
+          ) : null}
+        </Card>
+      </div>
+
+      <div>
+        <SectionHeader title="Fe" />
+        <Card raised>
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-ink text-sm font-semibold">Evangelio del día y examen de conciencia</p>
+              <p className="text-ink-dim text-xs mt-1 leading-5">Si lo activas, aparece como un bloque en Hoy. Si no, no se te menciona en ningún sitio.</p>
+            </div>
+            <button
+              onClick={() => setFaithEnabled.mutate(!profile.faithEnabled)}
+              role="switch"
+              aria-checked={!!profile.faithEnabled}
+              aria-label="Activar Fe"
+              className={`w-12 h-7 rounded-full border shrink-0 transition-colors ${
+                profile.faithEnabled ? "bg-progress border-progress" : "bg-surface border-line"
+              }`}
+            >
+              <span className={`block w-5 h-5 rounded-full bg-bg-deep transition-transform ${profile.faithEnabled ? "translate-x-6" : "translate-x-1"}`} />
+            </button>
+          </div>
+
+          {profile.faithEnabled ? (
+            <div className="mt-4 pt-4 border-t border-line-subtle">
+              <Link href="/faith" className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="w-9 h-9 rounded-full bg-progress/15 flex items-center justify-center shrink-0">
+                    <Cross size={17} className="text-progress" />
+                  </span>
+                  <p className="text-ink text-sm font-semibold">Misa, rosario, oración y examen</p>
+                </div>
+                <ChevronRight size={18} className="text-ink-faint shrink-0" />
+              </Link>
             </div>
           ) : null}
         </Card>

@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo } from "react";
 import { ShieldAlert } from "lucide-react";
-import { commitmentsForDay } from "@/features/contract/arc";
+import { commitmentsForDay, dayOfArc } from "@/features/contract/arc";
 import { KIND_HREF, SLOT_LABEL, SLOT_ORDER } from "@/features/contract/catalogue";
 import { useActiveContract, useCommitments } from "@/features/contract/hooks";
 import { useFocusSessions } from "@/features/focus/hooks";
@@ -17,7 +17,7 @@ import { useMeditationSessions } from "@/features/meditation/hooks";
 import { useProfile } from "@/features/profile/hooks";
 import { useRoutines } from "@/features/routines/hooks";
 import { sleptMinutes } from "@/features/sleep/calc";
-import { useSleepLogByDate } from "@/features/sleep/hooks";
+import { useSleepLogByDate, useSleepLogs } from "@/features/sleep/hooks";
 import { useActiveSession, useRecentSessions, useStartSession } from "@/features/workouts/hooks";
 import { cn } from "@/lib/cn";
 import { todayKey } from "@/lib/date";
@@ -79,6 +79,7 @@ export default function DashboardPage() {
   const startSession = useStartSession();
 
   const { data: lastNight } = useSleepLogByDate(today);
+  const { data: allSleepLogs = [] } = useSleepLogs();
   const { data: meditationSessions = [] } = useMeditationSessions();
   const { data: todayJournal } = useJournalEntryByDate(today);
   const { data: focusSessions = [] } = useFocusSessions();
@@ -105,6 +106,16 @@ export default function DashboardPage() {
   const ateToday = (nutrition?.mealCount ?? 0) > 0;
 
   const todaysCommitments = useMemo(() => commitmentsForDay(commitments, today), [commitments, today]);
+
+  // La tarjeta de sueño tiene que devolver algo aunque hoy no haya registro
+  // — la media de 7 días es lo que la hace útil sin depender de que el
+  // usuario haya apuntado nada esta noche.
+  const sleepAvg7dMin = useMemo(() => {
+    const cutoff = Date.now() - 7 * 86400000;
+    const inWindow = allSleepLogs.filter((l) => new Date(l.date).getTime() >= cutoff);
+    if (inWindow.length === 0) return null;
+    return Math.round(inWindow.reduce((s, l) => s + sleptMinutes(l), 0) / inWindow.length);
+  }, [allSleepLogs]);
 
   // Recuperación no es un compromiso del contrato: es una cuenta que corre
   // sola. Solo aparece si el usuario la ha activado en Perfil.
@@ -166,10 +177,18 @@ export default function DashboardPage() {
             cta: { label: "Empezar entrenamiento", onClick: handleStart },
           };
         }
-        case "sleep":
+        case "sleep": {
+          const avgLabel = sleepAvg7dMin !== null ? `media 7d: ${formatHoursMinutes(sleepAvg7dMin)}` : null;
           return lastNight
-            ? { ...base, timeLabel: lastNight.riseTime, meta: formatHoursMinutes(sleptMinutes(lastNight)), state: "done", href: undefined }
-            : { ...base, meta: "Sin registrar", state: "pending" };
+            ? {
+                ...base,
+                timeLabel: lastNight.riseTime,
+                meta: avgLabel ? `${formatHoursMinutes(sleptMinutes(lastNight))} · ${avgLabel}` : formatHoursMinutes(sleptMinutes(lastNight)),
+                state: "done",
+                href: undefined,
+              }
+            : { ...base, meta: avgLabel ? `Sin registrar · ${avgLabel}` : "Sin registrar", state: "pending" };
+        }
         case "nutrition":
           return ateToday
             ? { ...base, meta: `${Math.round(nutrition?.calories ?? 0)} kcal registradas`, state: "done", href: undefined }
@@ -193,24 +212,31 @@ export default function DashboardPage() {
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todaysCommitments, activeSession, completedSessionToday, suggestedRoutine, lastNight, ateToday, nutrition, meditatedToday, todayJournal, focusedToday, router]);
+  }, [todaysCommitments, activeSession, completedSessionToday, suggestedRoutine, lastNight, sleepAvg7dMin, ateToday, nutrition, meditatedToday, todayJournal, focusedToday, router]);
 
   const sorted = useMemo(() => [...items].sort((a, b) => a.order - b.order), [items]);
   const doneCount = items.filter((i) => i.state === "done").length;
+  const arcDay = contract ? dayOfArc(contract, today) : null;
 
   return (
     <div className="flex flex-col gap-6">
       <div>
         <div className="flex items-end justify-between mb-2">
           <h1 className="text-ink font-display font-semibold text-[26px] leading-tight tracking-tight">Tu día</h1>
-          <span className="text-ink-faint text-xs font-semibold">
-            {doneCount} de {items.length}
-          </span>
+          {arcDay !== null ? (
+            <span className="text-ink-faint text-xs font-semibold">
+              Día {arcDay} de {contract!.durationDays}
+            </span>
+          ) : items.length > 0 ? (
+            <span className="text-ink-faint text-xs font-semibold">
+              {doneCount} de {items.length}
+            </span>
+          ) : null}
         </div>
         <div className="h-[2px] bg-[#1B1B1E]">
           <div
             className="h-[2px] bg-progress transition-all"
-            style={{ width: `${items.length === 0 ? 0 : Math.round((doneCount / items.length) * 100)}%` }}
+            style={{ width: `${arcDay !== null ? Math.round((arcDay / contract!.durationDays) * 100) : items.length === 0 ? 0 : Math.round((doneCount / items.length) * 100)}%` }}
           />
         </div>
       </div>

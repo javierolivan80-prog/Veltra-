@@ -1,13 +1,21 @@
-// Client-side Web Push helpers — used by the Hábitos "Activar notificaciones"
-// flow. Requires NEXT_PUBLIC_VAPID_PUBLIC_KEY to be set and a Supabase
-// project configured (see NOTIFICATIONS_SETUP.md); without either, this
-// degrades to a no-op and Hábitos falls back to its in-app "pendientes hoy"
-// prompt.
+// Client-side service worker + Web Push helpers.
+//
+// The service worker itself (registerServiceWorker) is registered
+// unconditionally and early (see src/features/pwa/registerServiceWorker.tsx)
+// — it's what gives Hoy an offline shell (Fase 7), which has nothing to do
+// with whether the user ever opts into push. Push specifically (below)
+// requires NEXT_PUBLIC_VAPID_PUBLIC_KEY and a Supabase project configured
+// (see NOTIFICATIONS_SETUP.md); without either, it degrades to a no-op and
+// Hábitos falls back to its in-app "pendientes hoy" prompt.
 
 const VAPID_PUBLIC_KEY = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
 
+export function isServiceWorkerSupported(): boolean {
+  return typeof window !== "undefined" && "serviceWorker" in navigator;
+}
+
 export function isPushSupported(): boolean {
-  return typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window && !!VAPID_PUBLIC_KEY;
+  return isServiceWorkerSupported() && "PushManager" in window && !!VAPID_PUBLIC_KEY;
 }
 
 function urlBase64ToUint8Array(base64: string): Uint8Array {
@@ -16,7 +24,7 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
 }
 
-async function registerServiceWorker(): Promise<ServiceWorkerRegistration> {
+export async function registerServiceWorker(): Promise<ServiceWorkerRegistration> {
   return navigator.serviceWorker.register("/sw.js");
 }
 

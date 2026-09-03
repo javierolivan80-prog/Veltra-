@@ -7,6 +7,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { useApplyAutoReductions, type DoneDaysByKind } from "@/features/contract/adaptive";
 import { commitmentsForDay, dayOfArc } from "@/features/contract/arc";
+import { InstallPrompt } from "@/features/pwa/InstallPrompt";
 import { KIND_HREF, SLOT_LABEL, SLOT_ORDER } from "@/features/contract/catalogue";
 import { useActiveContract, useCommitments } from "@/features/contract/hooks";
 import { popAdaptiveNotices } from "@/features/contract/notices";
@@ -460,6 +461,8 @@ export default function DashboardPage() {
           </div>
         </Link>
       ) : null}
+
+      <InstallPrompt eligible={arcDay !== null && arcDay >= 2} />
     </div>
   );
 }

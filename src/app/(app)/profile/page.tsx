@@ -270,6 +270,11 @@ export default function ProfilePage() {
               </Link>
             </div>
           ) : null}
+          {setFaithEnabled.isError ? (
+            <p className="text-danger text-xs mt-3 leading-5">
+              Error: {setFaithEnabled.error instanceof Error ? setFaithEnabled.error.message : JSON.stringify(setFaithEnabled.error)}
+            </p>
+          ) : null}
         </Card>
       </div>
 

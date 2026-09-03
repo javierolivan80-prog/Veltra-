@@ -131,7 +131,8 @@ export async function setFaithEnabled(enabled: boolean): Promise<void> {
   if (isSupabaseConfigured) {
     const supabase = getSupabaseBrowserClient()!;
     const userId = await requireUserId();
-    await supabase.from("profile").update({ faith_enabled: enabled, updated_at: new Date().toISOString() }).eq("id", userId);
+    const { error } = await supabase.from("profile").update({ faith_enabled: enabled, updated_at: new Date().toISOString() }).eq("id", userId);
+    if (error) throw error;
     return;
   }
   const db = await getDb();

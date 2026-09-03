@@ -4,7 +4,7 @@ import { motion } from "framer-motion";
 import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
-type Variant = "primary" | "secondary" | "ghost" | "danger" | "ai";
+type Variant = "primary" | "secondary" | "ghost" | "danger";
 type Size = "sm" | "md" | "lg";
 
 interface ButtonProps {
@@ -24,7 +24,6 @@ const VARIANT_STYLES: Record<Variant, string> = {
   secondary: "bg-surface-raised border border-line text-ink hover:bg-surface-hover",
   ghost: "bg-transparent text-ink-dim hover:text-ink",
   danger: "bg-danger text-white hover:bg-danger/90",
-  ai: "bg-ai text-white hover:bg-ai/90",
 };
 
 const SIZE_STYLES: Record<Size, string> = {

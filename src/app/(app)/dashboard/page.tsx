@@ -70,13 +70,16 @@ const KIND_ICON: Record<CommitmentKind, LucideIcon> = {
   habit: Check,
 };
 
+// El morado es exclusivo de la IA (la revisión semanal en Progreso) — aquí
+// serían solo iconos de tipo de compromiso, así que usan el único acento de
+// acción de la app en vez de competir por ese color.
 const KIND_COLOR: Record<CommitmentKind, string> = {
   workout: "text-progress",
   sleep: "text-sleep",
   nutrition: "text-progress",
-  meditation: "text-ai",
-  journaling: "text-ai",
-  focus: "text-ai",
+  meditation: "text-progress",
+  journaling: "text-progress",
+  focus: "text-progress",
   habit: "text-progress",
 };
 
@@ -333,7 +336,7 @@ export default function DashboardPage() {
       {notices.length > 0 ? (
         <div className="flex flex-col gap-2">
           {notices.map((text, i) => (
-            <div key={i} className="flex items-start gap-2.5 border border-line-subtle rounded-xl bg-[#0E0E0E] px-3.5 py-3">
+            <div key={i} className="flex items-start gap-2.5 border border-line-subtle rounded-xl bg-bg-soft px-3.5 py-3">
               <p className="text-ink-dim text-xs leading-5 flex-1">{text}</p>
               <button
                 onClick={() => setNotices((prev) => prev.filter((_, idx) => idx !== i))}
@@ -389,8 +392,8 @@ export default function DashboardPage() {
               const card = (
                 <div
                   className={cn(
-                    "rounded-[14px] p-4",
-                    it.state === "now" ? "border border-progress/25 bg-gradient-to-b from-[#121614] to-[#0E0F0E]" : "border border-line-subtle bg-[#0E0E0E]"
+                    "rounded-2xl p-4",
+                    it.state === "now" ? "border border-progress/25 bg-progress-bg" : "border border-line-subtle bg-bg-soft"
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -446,7 +449,7 @@ export default function DashboardPage() {
       {cleanDays !== null ? (
         <Link
           href="/addictions"
-          className="flex items-center gap-3 border border-line-subtle rounded-[14px] bg-[#0E0E0E] p-4 hover:border-line transition-colors"
+          className="flex items-center gap-3 border border-line-subtle rounded-2xl bg-bg-soft p-4 hover:border-line transition-colors"
         >
           <ShieldAlert size={16} className="text-addiction shrink-0" />
           <div className="flex-1 min-w-0">

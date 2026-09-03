@@ -292,7 +292,7 @@ export default function ProgressPage() {
             {contracts
               .filter((c) => c.status !== "active")
               .map((c) => (
-                <div key={c.id} className="border border-line-subtle rounded-lg bg-[#0E0E0E] px-3.5 py-3 flex items-center justify-between gap-3">
+                <div key={c.id} className="border border-line-subtle rounded-lg bg-bg-soft px-3.5 py-3 flex items-center justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-ink text-sm font-semibold truncate">{FOCUS_OPTIONS.find((f) => f.value === c.focus)?.title}</p>
                     <p className="text-ink-faint text-xs mt-0.5">
@@ -325,24 +325,24 @@ export default function ProgressPage() {
       <SegmentedControl value={statsWindow} onChange={setStatsWindow} options={STATS_WINDOWS.map((w) => ({ value: w.value, label: w.label }))} />
 
       <div className="grid grid-cols-2 gap-2">
-        <div className="border border-line-subtle rounded-lg bg-[#0E0E0E] px-3.5 py-3">
+        <div className="border border-line-subtle rounded-lg bg-bg-soft px-3.5 py-3">
           <span className="text-ink-faint text-[10.5px] font-bold uppercase tracking-wide">Sesiones</span>
           <p className="text-progress font-display font-semibold text-[22px] mt-1.5">{aggregate.sessionCount}</p>
           <p className="text-ink-faint text-[11px] mt-1">entrenamientos</p>
         </div>
-        <div className="border border-line-subtle rounded-lg bg-[#0E0E0E] px-3.5 py-3">
+        <div className="border border-line-subtle rounded-lg bg-bg-soft px-3.5 py-3">
           <span className="text-ink-faint text-[10.5px] font-bold uppercase tracking-wide">Sueño medio</span>
           <p className="text-sleep font-display font-semibold text-[22px] mt-1.5">{aggregate.avgSleepMin !== null ? formatHoursMinutes(Math.round(aggregate.avgSleepMin)) : "—"}</p>
           <p className="text-ink-faint text-[11px] mt-1">
             {aggregate.sleepDeltaMin !== null ? `${aggregate.sleepDeltaMin >= 0 ? "+" : ""}${aggregate.sleepDeltaMin} min vs. periodo previo` : "sin datos previos"}
           </p>
         </div>
-        <div className="border border-line-subtle rounded-lg bg-[#0E0E0E] px-3.5 py-3">
+        <div className="border border-line-subtle rounded-lg bg-bg-soft px-3.5 py-3">
           <span className="text-ink-faint text-[10.5px] font-bold uppercase tracking-wide">Kcal medias</span>
           <p className="text-info font-display font-semibold text-[22px] mt-1.5">{aggregate.avgKcal !== null ? Math.round(aggregate.avgKcal).toLocaleString("es-ES") : "—"}</p>
           <p className="text-ink-faint text-[11px] mt-1">/ día</p>
         </div>
-        <div className="border border-line-subtle rounded-lg bg-[#0E0E0E] px-3.5 py-3">
+        <div className="border border-line-subtle rounded-lg bg-bg-soft px-3.5 py-3">
           <span className="text-ink-faint text-[10.5px] font-bold uppercase tracking-wide">Peso</span>
           <p className="text-ink font-display font-semibold text-[22px] mt-1.5">
             {profile?.bodyweightKg ?? "—"} <span className="text-ink-faint text-xs font-medium">kg</span>
@@ -371,7 +371,7 @@ export default function ProgressPage() {
                     setMetric("weight");
                   }}
                   className={cn(
-                    "flex items-center gap-3 w-full text-left bg-[#0E0E0E] border rounded-lg px-3.5 py-3 transition-colors",
+                    "flex items-center gap-3 w-full text-left bg-bg-soft border rounded-lg px-3.5 py-3 transition-colors",
                     selectedId === row.exercise.id ? "border-progress/40" : "border-line-subtle hover:border-line"
                   )}
                 >

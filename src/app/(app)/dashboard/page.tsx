@@ -10,7 +10,7 @@ import { KIND_HREF, SLOT_LABEL, SLOT_ORDER } from "@/features/contract/catalogue
 import { useActiveContract, useCommitments } from "@/features/contract/hooks";
 import { useFocusSessions } from "@/features/focus/hooks";
 import { useDailyNutrition } from "@/features/food/hooks";
-import { useJournalEntryByDate } from "@/features/journaling/hooks";
+import { useJournalEntries, useJournalEntryByDate } from "@/features/journaling/hooks";
 import { useAddictions, useAllRelapses } from "@/features/addictions/hooks";
 import { currentStreakStartMs } from "@/features/addictions/stats";
 import { useMeditationSessions } from "@/features/meditation/hooks";
@@ -82,6 +82,7 @@ export default function DashboardPage() {
   const { data: allSleepLogs = [] } = useSleepLogs();
   const { data: meditationSessions = [] } = useMeditationSessions();
   const { data: todayJournal } = useJournalEntryByDate(today);
+  const { data: allJournalEntries = [] } = useJournalEntries();
   const { data: focusSessions = [] } = useFocusSessions();
   const { data: nutrition } = useDailyNutrition(today);
   const { data: profile } = useProfile();
@@ -107,15 +108,34 @@ export default function DashboardPage() {
 
   const todaysCommitments = useMemo(() => commitmentsForDay(commitments, today), [commitments, today]);
 
-  // La tarjeta de sueño tiene que devolver algo aunque hoy no haya registro
-  // — la media de 7 días es lo que la hace útil sin depender de que el
-  // usuario haya apuntado nada esta noche.
+  // Ninguna tarjeta puede ser solo una petición de datos: cuando hoy no hay
+  // nada que registrar, cada una devuelve el agregado de los últimos 7 días
+  // en vez de un "Sin registrar" sin contenido. Si tampoco hay nada en esa
+  // ventana, el agregado es null y la tarjeta se queda en el estado simple.
   const sleepAvg7dMin = useMemo(() => {
     const cutoff = Date.now() - 7 * 86400000;
     const inWindow = allSleepLogs.filter((l) => new Date(l.date).getTime() >= cutoff);
     if (inWindow.length === 0) return null;
     return Math.round(inWindow.reduce((s, l) => s + sleptMinutes(l), 0) / inWindow.length);
   }, [allSleepLogs]);
+
+  const meditation7dMin = useMemo(() => {
+    const cutoff = Date.now() - 7 * 86400000;
+    const total = meditationSessions.filter((s) => new Date(s.completedAt).getTime() >= cutoff).reduce((sum, s) => sum + s.durationMinutes, 0);
+    return total > 0 ? total : null;
+  }, [meditationSessions]);
+
+  const focus7dMin = useMemo(() => {
+    const cutoff = Date.now() - 7 * 86400000;
+    const total = focusSessions.filter((s) => new Date(s.completedAt).getTime() >= cutoff).reduce((sum, s) => sum + s.durationMinutes, 0);
+    return total > 0 ? total : null;
+  }, [focusSessions]);
+
+  const journal7dCount = useMemo(() => {
+    const cutoff = Date.now() - 7 * 86400000;
+    const count = allJournalEntries.filter((e) => new Date(e.createdAt).getTime() >= cutoff).length;
+    return count > 0 ? count : null;
+  }, [allJournalEntries]);
 
   // Recuperación no es un compromiso del contrato: es una cuenta que corre
   // sola. Solo aparece si el usuario la ha activado en Perfil.
@@ -193,18 +213,24 @@ export default function DashboardPage() {
           return ateToday
             ? { ...base, meta: `${Math.round(nutrition?.calories ?? 0)} kcal registradas`, state: "done", href: undefined }
             : { ...base, meta: "Sin registrar", state: "pending" };
-        case "meditation":
+        case "meditation": {
+          const weekLabel = meditation7dMin !== null ? `7d: ${meditation7dMin} min` : null;
           return meditatedToday
             ? { ...base, timeLabel: timeLabelOf(meditatedToday.completedAt).label, meta: `${meditatedToday.durationMinutes} min`, state: "done", href: undefined }
-            : { ...base, meta: "Sin registrar", state: "pending" };
-        case "journaling":
+            : { ...base, meta: weekLabel ? `Sin registrar · ${weekLabel}` : "Sin registrar", state: "pending" };
+        }
+        case "journaling": {
+          const weekLabel = journal7dCount !== null ? `${journal7dCount} ${journal7dCount === 1 ? "entrada" : "entradas"} esta semana` : null;
           return todayJournal
             ? { ...base, timeLabel: timeLabelOf(todayJournal.createdAt).label, meta: "Entrada de hoy", state: "done", href: undefined }
-            : { ...base, meta: "Sin escribir", state: "pending" };
-        case "focus":
+            : { ...base, meta: weekLabel ? `Sin escribir · ${weekLabel}` : "Sin escribir", state: "pending" };
+        }
+        case "focus": {
+          const weekLabel = focus7dMin !== null ? `7d: ${focus7dMin} min` : null;
           return focusedToday
             ? { ...base, timeLabel: timeLabelOf(focusedToday.completedAt).label, meta: `${focusedToday.durationMinutes} min`, state: "done", href: undefined }
-            : { ...base, meta: "Sin empezar", state: "pending" };
+            : { ...base, meta: weekLabel ? `Sin empezar · ${weekLabel}` : "Sin empezar", state: "pending" };
+        }
         default:
           // Los hábitos propios se marcan en su módulo: aquí solo se recuerda
           // que tocan hoy.
@@ -212,7 +238,23 @@ export default function DashboardPage() {
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todaysCommitments, activeSession, completedSessionToday, suggestedRoutine, lastNight, sleepAvg7dMin, ateToday, nutrition, meditatedToday, todayJournal, focusedToday, router]);
+  }, [
+    todaysCommitments,
+    activeSession,
+    completedSessionToday,
+    suggestedRoutine,
+    lastNight,
+    sleepAvg7dMin,
+    ateToday,
+    nutrition,
+    meditatedToday,
+    meditation7dMin,
+    todayJournal,
+    journal7dCount,
+    focusedToday,
+    focus7dMin,
+    router,
+  ]);
 
   const sorted = useMemo(() => [...items].sort((a, b) => a.order - b.order), [items]);
   const doneCount = items.filter((i) => i.state === "done").length;

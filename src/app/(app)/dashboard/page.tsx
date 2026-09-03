@@ -1,15 +1,17 @@
 "use client";
 
-import { Book, Brain, Check, Dumbbell, Moon, Play, Target, UtensilsCrossed, type LucideIcon } from "lucide-react";
+import { Book, Brain, Check, Dumbbell, Moon, Play, Target, UtensilsCrossed, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ShieldAlert } from "lucide-react";
+import { useApplyAutoReductions, type DoneDaysByKind } from "@/features/contract/adaptive";
 import { commitmentsForDay, dayOfArc } from "@/features/contract/arc";
 import { KIND_HREF, SLOT_LABEL, SLOT_ORDER } from "@/features/contract/catalogue";
 import { useActiveContract, useCommitments } from "@/features/contract/hooks";
+import { popAdaptiveNotices } from "@/features/contract/notices";
 import { useFocusSessions } from "@/features/focus/hooks";
-import { useDailyNutrition } from "@/features/food/hooks";
+import { useAllFoodMeals, useDailyNutrition } from "@/features/food/hooks";
 import { useJournalEntries, useJournalEntryByDate } from "@/features/journaling/hooks";
 import { useAddictions, useAllRelapses } from "@/features/addictions/hooks";
 import { currentStreakStartMs } from "@/features/addictions/stats";
@@ -20,7 +22,7 @@ import { sleptMinutes } from "@/features/sleep/calc";
 import { useSleepLogByDate, useSleepLogs } from "@/features/sleep/hooks";
 import { useActiveSession, useRecentSessions, useStartSession } from "@/features/workouts/hooks";
 import { cn } from "@/lib/cn";
-import { todayKey } from "@/lib/date";
+import { daysBetweenDayKeys, todayKey } from "@/lib/date";
 import { formatHoursMinutes } from "@/lib/duration";
 import type { CommitmentKind } from "@/types/models";
 
@@ -29,6 +31,33 @@ function timeLabelOf(iso: string): { label: string; minutes: number } {
   const h = d.getHours();
   const m = d.getMinutes();
   return { label: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`, minutes: h * 60 + m };
+}
+
+const LAST_OPENED_KEY = "veltra:lastOpenedDay";
+
+/** Si han pasado dos días completos sin abrir la app, hoy se activa un modo
+ *  mínimo: un solo bloque en vez del plan entero. Un par de días perdidos no
+ *  tienen por qué convertirse en abandono por sobrecarga al volver. */
+function useReturningAfterGap(today: string): boolean {
+  const [returning, setReturning] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      try {
+        const last = localStorage.getItem(LAST_OPENED_KEY);
+        if (last && daysBetweenDayKeys(last, today) >= 3) setReturning(true);
+        localStorage.setItem(LAST_OPENED_KEY, today);
+      } catch {
+        // localStorage no disponible — nunca activa el modo mínimo, no rompe nada más.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [today]);
+  return returning;
 }
 
 const KIND_ICON: Record<CommitmentKind, LucideIcon> = {
@@ -75,7 +104,10 @@ export default function DashboardPage() {
   const { data: contract } = useActiveContract();
   const { data: commitments = [] } = useCommitments(contract?.id ?? null);
   const { data: routines = [] } = useRoutines();
-  const { data: recentSessions = [] } = useRecentSessions(10);
+  // 30 en vez de 10: además de "rutina sugerida" y "sesión de hoy", esta
+  // lista alimenta la detección de fallos de la Fase 5, que mira hasta 3
+  // semanas atrás.
+  const { data: recentSessions = [] } = useRecentSessions(30);
   const { data: activeSession } = useActiveSession();
   const startSession = useStartSession();
 
@@ -86,9 +118,43 @@ export default function DashboardPage() {
   const { data: allJournalEntries = [] } = useJournalEntries();
   const { data: focusSessions = [] } = useFocusSessions();
   const { data: nutrition } = useDailyNutrition(today);
+  const { data: allMeals = [] } = useAllFoodMeals();
   const { data: profile } = useProfile();
   const { data: addictions = [] } = useAddictions();
   const { data: allRelapses = [] } = useAllRelapses();
+
+  const returning = useReturningAfterGap(today);
+  const [dismissedMinimal, setDismissedMinimal] = useState(false);
+  const minimalMode = returning && !dismissedMinimal;
+
+  const [notices, setNotices] = useState<string[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      const fresh = popAdaptiveNotices();
+      if (fresh.length > 0) setNotices((prev) => [...prev, ...fresh]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [commitments]);
+
+  // Qué día, por tipo de compromiso, hubo algo registrado — lo que la
+  // Fase 5 necesita para saber si un compromiso lleva 3 fallos seguidos.
+  const doneDaysByKind: DoneDaysByKind = useMemo(
+    () => ({
+      workout: new Set(recentSessions.map((s) => s.startedAt.slice(0, 10))),
+      sleep: new Set(allSleepLogs.map((l) => l.date)),
+      nutrition: new Set(allMeals.map((m) => m.date)),
+      meditation: new Set(meditationSessions.map((s) => s.completedAt.slice(0, 10))),
+      focus: new Set(focusSessions.map((s) => s.completedAt.slice(0, 10))),
+      journaling: new Set(allJournalEntries.map((e) => e.date)),
+    }),
+    [recentSessions, allSleepLogs, allMeals, meditationSessions, focusSessions, allJournalEntries]
+  );
+  useApplyAutoReductions(commitments, doneDaysByKind);
 
   const suggestedRoutine = useMemo(() => {
     if (routines.length === 0) return null;
@@ -258,11 +324,29 @@ export default function DashboardPage() {
   ]);
 
   const sorted = useMemo(() => [...items].sort((a, b) => a.order - b.order), [items]);
+  const visibleItems = minimalMode ? sorted.slice(0, 1) : sorted;
   const doneCount = items.filter((i) => i.state === "done").length;
   const arcDay = contract ? dayOfArc(contract, today) : null;
 
   return (
     <div className="flex flex-col gap-6">
+      {notices.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {notices.map((text, i) => (
+            <div key={i} className="flex items-start gap-2.5 border border-line-subtle rounded-xl bg-[#0E0E0E] px-3.5 py-3">
+              <p className="text-ink-dim text-xs leading-5 flex-1">{text}</p>
+              <button
+                onClick={() => setNotices((prev) => prev.filter((_, idx) => idx !== i))}
+                className="text-ink-faint hover:text-ink shrink-0"
+                aria-label="Descartar"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <div>
         <div className="flex items-end justify-between mb-2">
           <h1 className="text-ink font-display font-semibold text-[26px] leading-tight tracking-tight">Tu día</h1>
@@ -284,13 +368,23 @@ export default function DashboardPage() {
         </div>
       </div>
 
+      {minimalMode && sorted.length > 0 && contract?.why ? (
+        <div className="border border-line-subtle rounded-2xl bg-surface px-4 py-4">
+          <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em]">Llevabas unos días fuera</p>
+          <p className="text-ink text-sm mt-2 leading-5">&ldquo;{contract.why}&rdquo;</p>
+          <button onClick={() => setDismissedMinimal(true)} className="text-ink-faint text-xs font-semibold mt-3.5 underline underline-offset-2">
+            Ver el plan completo de hoy
+          </button>
+        </div>
+      ) : null}
+
       {sorted.length === 0 ? (
         <p className="text-ink-dim text-sm">Hoy no toca ninguno de tus compromisos. Descansar también es parte del plan.</p>
       ) : (
         <div className="relative pl-6">
           <span className="absolute left-[5px] top-1.5 bottom-1.5 w-px bg-gradient-to-b from-transparent via-line to-transparent" />
           <div className="flex flex-col gap-5">
-            {sorted.map((it) => {
+            {visibleItems.map((it) => {
               const Icon = it.icon;
               const card = (
                 <div

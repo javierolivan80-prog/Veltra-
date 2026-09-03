@@ -60,14 +60,14 @@ export default function WeightPage() {
         <Card raised>
           {target !== null ? (
             <div className="flex items-center gap-3">
-              <ProgressRing progress={progress} size={44} strokeWidth={5} color="#4DA3FF" trackColor="#0E2036" />
+              <ProgressRing progress={progress} size={44} strokeWidth={5} color="#2CE6A0" trackColor="#0E2A21" />
               <div>
                 <p className="text-ink text-lg font-display leading-none">{target}kg</p>
                 <p className="text-ink-dim text-xs mt-1">Meta</p>
               </div>
             </div>
           ) : (
-            <button onClick={() => setShowGoalForm(true)} className="text-info text-sm font-semibold">
+            <button onClick={() => setShowGoalForm(true)} className="text-progress text-sm font-semibold">
               Definir meta
             </button>
           )}

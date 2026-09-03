@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { ChevronDown, ChevronUp, Settings2 } from "lucide-react";
 import { useEffect, useState } from "react";
+import { Card } from "@/design-system/components/Card";
 import { ProgressRing } from "@/design-system/components/ProgressRing";
 import type { DailyNutrition, NutritionGoals } from "@/types/models";
 import { MacroBar } from "./MacroBar";
@@ -65,7 +66,7 @@ export function DailyProgressCard({
   }
 
   return (
-    <div className="rounded-3xl border border-line-subtle bg-surface-raised p-5">
+    <Card raised>
       <div className="flex items-center justify-between mb-5">
         <div className="flex items-center gap-4">
           <ProgressRing progress={calRatio} size={72} strokeWidth={7} color={CAL_COLOR}>
@@ -109,6 +110,6 @@ export function DailyProgressCard({
       </div>
 
       {totals.fiber > 0 ? <p className="text-ink-faint text-[11px] mt-4">Fibra: {Math.round(totals.fiber)} g · {totals.mealCount} comida{totals.mealCount !== 1 ? "s" : ""} hoy</p> : null}
-    </div>
+    </Card>
   );
 }

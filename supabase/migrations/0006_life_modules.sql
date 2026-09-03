@@ -100,6 +100,27 @@ create table if not exists finance_goals (
 
 -- --- Vida: Metas a largo plazo ---
 
+-- Algunos proyectos ya tenían una tabla `goals` creada a mano (con `id
+-- uuid`, la convención por defecto de Supabase) antes de que este archivo
+-- fijara la de ids de texto que usa el resto de la app — eso rompía la
+-- clave foránea de `goal_checkpoints` de abajo con "incompatible types:
+-- text and uuid". Goals está archivado (Fase 1) y no lo usa ninguna
+-- feature activa: si la tabla existe con el tipo antiguo y está vacía, se
+-- recrea con el tipo correcto. Si tuviera filas, no se toca — nunca se
+-- borran datos reales.
+do $$
+begin
+  if exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'goals' and column_name = 'id' and data_type = 'uuid'
+  ) then
+    if not exists (select 1 from public.goals limit 1) then
+      drop table if exists public.goal_checkpoints;
+      drop table if exists public.goals;
+    end if;
+  end if;
+end $$;
+
 create table if not exists goals (
   id text primary key,
   user_id uuid not null default auth.uid() references auth.users(id) on delete cascade,

@@ -10,6 +10,7 @@ import type {
   DailyMood,
   Exercise,
   Expense,
+  FaithCheckIn,
   FinanceGoals,
   FocusSession,
   FoodConversation,
@@ -39,7 +40,7 @@ import type {
 } from "@/types/models";
 
 export const DB_NAME = "veltra";
-export const DB_VERSION = 8;
+export const DB_VERSION = 9;
 
 /** Single-row store for the local nutrition goals — mirrors the per-user Supabase row. */
 export type StoredNutritionGoals = NutritionGoals & { id: string };
@@ -94,6 +95,7 @@ export interface VeltraDB extends DBSchema {
   contracts: { key: string; value: Contract; indexes: { status: string } };
   commitments: { key: string; value: Commitment; indexes: { contractId: string } };
   weeklyReviews: { key: string; value: WeeklyReview; indexes: { contractId: string } };
+  faithCheckins: { key: string; value: FaithCheckIn; indexes: { date: string } };
 }
 
 export const STORE_NAMES = [
@@ -133,4 +135,5 @@ export const STORE_NAMES = [
   "contracts",
   "commitments",
   "weeklyReviews",
+  "faithCheckins",
 ] as const;

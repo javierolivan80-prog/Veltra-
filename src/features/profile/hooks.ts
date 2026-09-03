@@ -73,6 +73,14 @@ export function useSetRecoveryEnabled() {
   });
 }
 
+export function useSetFaithEnabled() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (enabled: boolean) => repo.setFaithEnabled(enabled),
+    onSuccess: () => qc.invalidateQueries({ queryKey: profileKeys.profile }),
+  });
+}
+
 export function useUpdateTargetWeight() {
   const qc = useQueryClient();
   return useMutation({

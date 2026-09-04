@@ -1,12 +1,13 @@
 "use client";
 
-import { Book, Brain, Check, Cross, Dumbbell, Lightbulb, Moon, Play, Target, UtensilsCrossed, X, type LucideIcon } from "lucide-react";
+import { AlertTriangle, Book, Brain, Check, Cross, Dumbbell, Lightbulb, Moon, Play, Target, UtensilsCrossed, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { useApplyAutoReductions, type DoneDaysByKind } from "@/features/contract/adaptive";
 import { commitmentsForDay, dayOfArc } from "@/features/contract/arc";
+import { buildMotivationalNudges } from "@/features/contract/nudges";
 import { computePlanStreak } from "@/features/contract/streak";
 import { useFaithCheckInByDate, useFaithCheckIns } from "@/features/faith/hooks";
 import { faithDoneCount, faithDoneDays } from "@/features/faith/stats";
@@ -190,6 +191,10 @@ export default function DashboardPage() {
   const ateToday = (nutrition?.mealCount ?? 0) > 0;
 
   const todaysCommitments = useMemo(() => commitmentsForDay(commitments, today), [commitments, today]);
+  const motivationalNudges = useMemo(
+    () => buildMotivationalNudges(todaysCommitments, doneDaysByKind, today, contract?.why ?? null),
+    [todaysCommitments, doneDaysByKind, today, contract?.why]
+  );
 
   // Ninguna tarjeta puede ser solo una petición de datos: cuando hoy no hay
   // nada que registrar, cada una devuelve el agregado de los últimos 7 días
@@ -417,6 +422,17 @@ export default function DashboardPage() {
           />
         </div>
       </div>
+
+      {motivationalNudges.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {motivationalNudges.map((nudge) => (
+            <div key={nudge.commitmentId} className="flex items-start gap-2.5 border border-warn/30 rounded-xl bg-warn/10 px-3.5 py-3">
+              <AlertTriangle size={15} className="text-warn shrink-0 mt-0.5" />
+              <p className="text-ink text-sm leading-5 flex-1">{nudge.message}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {minimalMode && sorted.length > 0 && contract?.why ? (
         <div className="border border-line-subtle rounded-2xl bg-surface px-4 py-4">

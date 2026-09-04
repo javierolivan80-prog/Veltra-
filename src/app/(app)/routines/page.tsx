@@ -8,6 +8,7 @@ import { EmptyState } from "@/design-system/components/EmptyState";
 import { SectionHeader } from "@/design-system/components/SectionHeader";
 import { useFavoriteExercises } from "@/features/exercises/hooks";
 import { useRoutines } from "@/features/routines/hooks";
+import { WorkoutSuggestions } from "@/features/workouts/WorkoutSuggestions";
 import { useActiveSession, useStartSession } from "@/features/workouts/hooks";
 
 export default function RoutinesPage() {
@@ -48,6 +49,8 @@ export default function RoutinesPage() {
           <span className="block text-ink-dim text-xs mt-0.5">Empieza sin rutina y elige tú cada ejercicio sobre la marcha</span>
         </span>
       </button>
+
+      <WorkoutSuggestions />
 
       {!isLoading && routines.length === 0 ? (
         <Card raised>

@@ -14,8 +14,9 @@ import { StatNumber } from "@/design-system/components/StatNumber";
 import { FrequencyBars } from "@/design-system/charts/FrequencyBars";
 import { LineChart } from "@/design-system/charts/LineChart";
 import { ExerciseFormDialog } from "@/features/exercises/ExerciseFormDialog";
-import { useExercise, usePersonalRecords, useToggleFavorite } from "@/features/exercises/hooks";
+import { useExercise, useExercises, usePersonalRecords, useToggleFavorite } from "@/features/exercises/hooks";
 import { explainExerciseProgress, monthComparison } from "@/features/exercises/insights";
+import { findAlternatives } from "@/features/exercises/alternatives";
 import { RANK_META, computeRank, isRankEligible } from "@/features/exercises/ranks";
 import { linearPrediction, oneRmSeries, repsSeries, totalTrainingMinutes, weeklyFrequency, weightSeries } from "@/features/exercises/stats";
 import { useProfile } from "@/features/profile/hooks";
@@ -42,6 +43,7 @@ export default function ExerciseProfilePage() {
   const { data: exercise } = useExercise(params.exerciseId ?? null);
   const { data: sets = [] } = useSetsForExercise(params.exerciseId ?? null);
   const { data: profile } = useProfile();
+  const { data: allExercises = [] } = useExercises();
   const { data: prs = [] } = usePersonalRecords(params.exerciseId ?? null);
   const toggleFavorite = useToggleFavorite();
   const [tab, setTab] = useState<MetricTab>("weight");
@@ -91,6 +93,11 @@ export default function ExerciseProfilePage() {
     }
     return { weeks, labels };
   }, [sets]);
+
+  const alternatives = useMemo(() => {
+    if (!exercise || !profile) return [];
+    return findAlternatives(exercise, allExercises, profile.equipmentAvailable);
+  }, [exercise, allExercises, profile]);
 
   if (!exercise) return null;
 
@@ -237,6 +244,31 @@ export default function ExerciseProfilePage() {
           })}
         </div>
       </div>
+
+      {alternatives.length > 0 ? (
+        <div>
+          <SectionHeader title="Alternativas" subtitle="Con tu equipo disponible, si no puedes hacer este" />
+          <div className="flex flex-col gap-2">
+            {alternatives.map(({ exercise: alt, reason }) => (
+              <Link
+                key={alt.id}
+                href={`/exercises/${alt.id}`}
+                className="rounded-2xl border border-line-subtle bg-surface-raised px-4 py-3 flex items-center justify-between hover:border-line transition-colors"
+              >
+                <div className="min-w-0 pr-3">
+                  <p className="text-ink text-sm font-semibold truncate">{alt.name}</p>
+                  <p className="text-ink-faint text-[11px] mt-0.5">{reason === "same_pattern" ? "Mismo patrón de movimiento" : "Mismo grupo muscular"}</p>
+                </div>
+                <div className="flex gap-1 shrink-0">
+                  {alt.muscleGroups.slice(0, 2).map((m) => (
+                    <Badge key={m} label={MUSCLE_LABEL[m] ?? m} tone="info" />
+                  ))}
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       {exercise.notes ? (
         <div>

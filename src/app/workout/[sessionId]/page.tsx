@@ -12,6 +12,7 @@ import { useExercises } from "@/features/exercises/hooks";
 import { computeRank, isRankEligible } from "@/features/exercises/ranks";
 import { useProfile } from "@/features/profile/hooks";
 import { useRoutine } from "@/features/routines/hooks";
+import { lastSessionSetsFor, suggestWeightAdjustment } from "@/features/workouts/difficultyAdjust";
 import {
   useAddSet,
   useDeleteExerciseFromSession,
@@ -21,6 +22,7 @@ import {
   useLastSetForExercise,
   useSession,
   useSessionSets,
+  useSetsForExercise,
 } from "@/features/workouts/hooks";
 import { primeAlerts } from "@/lib/alert";
 import { cn } from "@/lib/cn";
@@ -104,6 +106,13 @@ export default function ActiveWorkoutPage() {
   );
 
   const { data: crossSessionLast } = useLastSetForExercise(current?.exerciseId ?? null, sessionId);
+  const { data: allSetsForCurrent = [] } = useSetsForExercise(current?.exerciseId ?? null);
+
+  const weightSuggestion = useMemo(() => {
+    if (!current) return null;
+    const lastSessionSets = lastSessionSetsFor(allSetsForCurrent, sessionId);
+    return suggestWeightAdjustment(lastSessionSets, current.targetRepsMin, current.targetRepsMax);
+  }, [current, allSetsForCurrent, sessionId]);
 
   useEffect(() => {
     const source = sessionSetsForCurrent.length > 0 ? sessionSetsForCurrent[sessionSetsForCurrent.length - 1] : crossSessionLast;
@@ -300,6 +309,17 @@ export default function ActiveWorkoutPage() {
                     </button>
                   </div>
                 ))}
+              </div>
+            ) : null}
+
+            {weightSuggestion ? (
+              <div
+                className={cn(
+                  "rounded-2xl px-4 py-3 mb-4 text-sm leading-5",
+                  weightSuggestion.direction === "increase" ? "bg-progress/10 text-progress" : weightSuggestion.direction === "decrease" ? "bg-warn/10 text-warn" : "bg-info/10 text-info"
+                )}
+              >
+                {weightSuggestion.message}
               </div>
             ) : null}
 

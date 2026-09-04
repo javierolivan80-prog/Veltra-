@@ -1,7 +1,7 @@
 import { listDailyMoods } from "@/features/mood/repo";
 import { listMeditationSessions } from "@/features/meditation/repo";
 import { listSleepLogs } from "@/features/sleep/repo";
-import { listRecentSessions } from "@/features/workouts/repo";
+import { listAllSets, listRecentSessions } from "@/features/workouts/repo";
 import { dayKey, shiftDayKey, todayKey } from "@/lib/date";
 import type { MoodOption } from "@/types/models";
 
@@ -31,11 +31,12 @@ function avg(nums: number[]): number {
  */
 export async function computeInsights(): Promise<Insight[]> {
   const cutoff = shiftDayKey(todayKey(), -WINDOW_DAYS);
-  const [sleepLogs, moods, meditations, sessions] = await Promise.all([
+  const [sleepLogs, moods, meditations, sessions, sets] = await Promise.all([
     listSleepLogs(),
     listDailyMoods(),
     listMeditationSessions(),
     listRecentSessions(90),
+    listAllSets(),
   ]);
 
   const moodByDate = new Map(moods.filter((m) => m.date >= cutoff).map((m) => [m.date, MOOD_SCORE[m.mood]] as const));
@@ -90,6 +91,29 @@ export async function computeInsights(): Promise<Insight[]> {
       insights.push({
         id: "activity-mood",
         text: "Los días que entrenas o meditas tu ánimo tiende a ser mejor que los días que no — no prueba causa, pero el patrón se repite en el último mes.",
+      });
+    }
+  }
+
+  // Señal 3: fatiga acumulada — entrenando muy cerca del fallo (RIR bajo) en
+  // los últimos 10 días justo cuando el sueño ha bajado frente a la ventana
+  // anterior. Ninguna señal sola basta (RIR bajo también pasa en una buena
+  // racha de progreso, y el sueño varía por mil motivos); juntas son la
+  // combinación real detrás de recomendar una descarga.
+  const recentCutoff = shiftDayKey(todayKey(), -10);
+  const priorCutoff = shiftDayKey(todayKey(), -30);
+  const recentRirValues = sets.filter((s) => !s.isWarmup && s.rir !== null && s.completedAt.slice(0, 10) >= recentCutoff).map((s) => s.rir as number);
+
+  const recentSleep = sleepLogs.filter((l) => l.quality != null && l.date >= recentCutoff).map((l) => l.quality as number);
+  const priorSleep = sleepLogs.filter((l) => l.quality != null && l.date >= priorCutoff && l.date < recentCutoff).map((l) => l.quality as number);
+
+  if (recentRirValues.length >= 12 && recentSleep.length >= MIN_BUCKET_DAYS && priorSleep.length >= MIN_BUCKET_DAYS) {
+    const avgRir = avg(recentRirValues);
+    const sleepDrop = avg(priorSleep) - avg(recentSleep);
+    if (avgRir <= 1.2 && sleepDrop >= 1) {
+      insights.push({
+        id: "fatigue-deload",
+        text: `Llevas 10 días entrenando muy cerca del fallo (RIR medio ${avgRir.toFixed(1)}) justo cuando tu sueño ha bajado — puede ser buen momento para una semana de descarga.`,
       });
     }
   }

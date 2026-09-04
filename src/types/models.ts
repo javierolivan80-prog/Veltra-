@@ -519,7 +519,7 @@ export interface Contract {
 
 /** Tipo de bloque en Hoy. Cada compromiso se resuelve en uno de los módulos
  *  que ya existen; no hay compromisos sin sitio donde registrarse. */
-export type CommitmentKind = "workout" | "sleep" | "nutrition" | "meditation" | "journaling" | "focus" | "habit";
+export type CommitmentKind = "workout" | "sleep" | "nutrition" | "meditation" | "journaling" | "focus" | "habit" | "faith";
 
 /** Franja, no hora exacta: prometer las 07:30 cuando nadie la ha configurado
  *  es lo que hacía que Hoy dijera "ahora: entrenamiento" a las 23:00. */

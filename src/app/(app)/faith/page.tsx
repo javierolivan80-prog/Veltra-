@@ -57,10 +57,17 @@ export default function FaithPage() {
         <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em]">Evangelio de hoy</p>
         {gospelPending ? (
           <p className="text-ink-faint text-sm mt-2.5">Cargando…</p>
-        ) : gospel?.snippet ? (
+        ) : gospel?.gospelText ? (
           <>
             <p className="text-ink text-base font-display font-semibold mt-2.5">{gospel.title}</p>
-            <p className="text-ink-dim text-sm mt-1.5 leading-6">{gospel.snippet}</p>
+            {gospel.citation ? <p className="text-progress text-xs font-semibold mt-1">{gospel.citation}</p> : null}
+            <p className="text-ink-dim text-sm mt-2.5 leading-6 whitespace-pre-line">{gospel.gospelText}</p>
+            {gospel.commentary ? (
+              <div className="mt-4 pt-4 border-t border-line-subtle">
+                <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em]">Comentario</p>
+                <p className="text-ink-dim text-sm mt-2.5 leading-6 whitespace-pre-line">{gospel.commentary}</p>
+              </div>
+            ) : null}
           </>
         ) : (
           <p className="text-ink-dim text-sm mt-2.5 leading-6">No se ha podido cargar aquí dentro — puedes leerlo en la fuente.</p>
@@ -69,10 +76,10 @@ export default function FaithPage() {
           href={gospel?.sourceUrl ?? "https://evangeli.net"}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex items-center gap-1.5 text-progress text-sm font-semibold mt-3.5"
+          className="flex items-center gap-1.5 text-ink-faint text-xs font-semibold mt-4"
         >
-          Leer el evangelio completo
-          <ExternalLink size={13} />
+          Fuente: evangeli.net
+          <ExternalLink size={11} />
         </a>
       </Card>
 

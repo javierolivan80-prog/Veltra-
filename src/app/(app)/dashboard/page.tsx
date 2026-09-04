@@ -8,7 +8,8 @@ import { ShieldAlert } from "lucide-react";
 import { useApplyAutoReductions, type DoneDaysByKind } from "@/features/contract/adaptive";
 import { commitmentsForDay, dayOfArc } from "@/features/contract/arc";
 import { computePlanStreak } from "@/features/contract/streak";
-import { useFaithCheckInByDate } from "@/features/faith/hooks";
+import { useFaithCheckInByDate, useFaithCheckIns } from "@/features/faith/hooks";
+import { faithDoneCount, faithDoneDays } from "@/features/faith/stats";
 import { useInsights } from "@/features/insights/hooks";
 import { InstallPrompt } from "@/features/pwa/InstallPrompt";
 import { PlanCelebration } from "@/design-system/components/PlanCelebration";
@@ -74,6 +75,7 @@ const KIND_ICON: Record<CommitmentKind, LucideIcon> = {
   journaling: Book,
   focus: Target,
   habit: Check,
+  faith: Cross,
 };
 
 // El morado es exclusivo de la IA (la revisión semanal en Progreso) — aquí
@@ -87,6 +89,7 @@ const KIND_COLOR: Record<CommitmentKind, string> = {
   journaling: "text-progress",
   focus: "text-progress",
   habit: "text-progress",
+  faith: "text-progress",
 };
 
 /** Un alto en "Tu día": hecho, en marcha, o todavía por delante. El plan lo
@@ -132,6 +135,7 @@ export default function DashboardPage() {
   const { data: addictions = [] } = useAddictions();
   const { data: allRelapses = [] } = useAllRelapses();
   const { data: faithCheckIn } = useFaithCheckInByDate(today);
+  const { data: allFaithCheckIns = [] } = useFaithCheckIns();
   const { data: insights = [] } = useInsights();
 
   const returning = useReturningAfterGap(today);
@@ -162,8 +166,9 @@ export default function DashboardPage() {
       meditation: new Set(meditationSessions.map((s) => s.completedAt.slice(0, 10))),
       focus: new Set(focusSessions.map((s) => s.completedAt.slice(0, 10))),
       journaling: new Set(allJournalEntries.map((e) => e.date)),
+      faith: faithDoneDays(allFaithCheckIns),
     }),
-    [recentSessions, allSleepLogs, allMeals, meditationSessions, focusSessions, allJournalEntries]
+    [recentSessions, allSleepLogs, allMeals, meditationSessions, focusSessions, allJournalEntries, allFaithCheckIns]
   );
   useApplyAutoReductions(commitments, doneDaysByKind);
 
@@ -225,7 +230,10 @@ export default function DashboardPage() {
     return Math.max(...days);
   }, [profile?.recoveryEnabled, addictions, allRelapses]);
 
-  const faithDoneCount = (faithCheckIn?.mass ? 1 : 0) + (faithCheckIn?.rosary ? 1 : 0) + (faithCheckIn?.prayer ? 1 : 0) + (faithCheckIn?.examen ? 1 : 0);
+  const faithToday = faithDoneCount(faithCheckIn);
+  // Si Fe ya es un compromiso de hoy sale arriba, en el plan: el bloque
+  // suelto de abajo sobraría y aparecería dos veces la misma cosa.
+  const faithIsCommitment = todaysCommitments.some((c) => c.kind === "faith");
 
   const handleStart = async () => {
     if (activeSession) {
@@ -311,6 +319,12 @@ export default function DashboardPage() {
             ? { ...base, timeLabel: timeLabelOf(focusedToday.completedAt).label, meta: `${focusedToday.durationMinutes} min`, state: "done", href: undefined }
             : { ...base, meta: weekLabel ? `Sin empezar · ${weekLabel}` : "Sin empezar", state: "pending" };
         }
+        case "faith":
+          // Cumple con una de las cuatro; el "X de 4" es información, no un
+          // listón que haya que completar para que el día cuente.
+          return faithToday > 0
+            ? { ...base, meta: `${faithToday} de 4 hoy`, state: "done" }
+            : { ...base, meta: "Sin registrar", state: "pending" };
         default:
           // Los hábitos propios se marcan en su módulo: aquí solo se recuerda
           // que tocan hoy.
@@ -333,6 +347,7 @@ export default function DashboardPage() {
     journal7dCount,
     focusedToday,
     focus7dMin,
+    faithToday,
     router,
   ]);
 
@@ -509,12 +524,12 @@ export default function DashboardPage() {
         </div>
       ) : null}
 
-      {profile?.faithEnabled ? (
+      {profile?.faithEnabled && !faithIsCommitment ? (
         <Link href="/faith" className="flex items-center gap-3 border border-line-subtle rounded-2xl bg-bg-soft p-4 hover:border-line transition-colors">
           <Cross size={16} className="text-progress shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-ink text-[15px] font-display font-semibold">Fe</p>
-            <p className="text-ink-faint text-xs mt-0.5">{faithDoneCount} de 4 hoy</p>
+            <p className="text-ink-faint text-xs mt-0.5">{faithToday} de 4 hoy</p>
           </div>
         </Link>
       ) : null}

@@ -79,20 +79,24 @@ self.addEventListener("push", (event) => {
     return;
   }
   const { title, body, habitId, date } = payload;
-  event.waitUntil(
-    self.registration.showNotification(title || "Veltra", {
-      body,
-      icon: "/icon-192.png",
-      badge: "/icon-192.png",
-      tag: `habit-${habitId}-${date}`,
-      data: { habitId, date },
-      actions: [
-        { action: "done", title: "Sí" },
-        { action: "not_done", title: "No" },
-        { action: "skipped", title: "Saltado" },
-      ],
-    })
-  );
+  const options = {
+    body,
+    icon: "/icon-192.png",
+    badge: "/icon-192.png",
+    tag: habitId ? `habit-${habitId}-${date}` : `nudge-${Date.now()}`,
+    data: { habitId, date },
+  };
+  // Los "Sí/No/Saltado" solo tienen sentido cuando el aviso es sobre un
+  // hábito concreto — un aviso de racha en riesgo puede citar varios, y no
+  // hay uno solo al que responder con esos botones.
+  if (habitId) {
+    options.actions = [
+      { action: "done", title: "Sí" },
+      { action: "not_done", title: "No" },
+      { action: "skipped", title: "Saltado" },
+    ];
+  }
+  event.waitUntil(self.registration.showNotification(title || "Veltra", options));
 });
 
 self.addEventListener("notificationclick", (event) => {

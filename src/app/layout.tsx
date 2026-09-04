@@ -17,12 +17,16 @@ const inter = Inter({
 
 export const metadata: Metadata = {
   title: "Veltra",
-  description: "Disfruta viendo cómo progresas.",
+  description: "Un arco de 90 días, no un tracker: firma tus compromisos y Veltra te da el plan de cada día.",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
     title: "Veltra",
+  },
+  icons: {
+    icon: "/icon.svg",
+    apple: "/apple-touch-icon.png",
   },
 };
 

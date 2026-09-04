@@ -95,6 +95,7 @@ export async function upsertProfile(input: ProfileInput): Promise<Profile> {
     onboardingCompleted: true,
     targetWeightKg: existing?.targetWeightKg ?? null,
     recoveryEnabled: existing?.recoveryEnabled ?? false,
+    faithEnabled: existing?.faithEnabled ?? false,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };
@@ -124,6 +125,19 @@ export async function setRecoveryEnabled(enabled: boolean): Promise<void> {
   const db = await getDb();
   const existing = await db.get("profile", LOCAL_PROFILE_ID);
   if (existing) await db.put("profile", { ...existing, recoveryEnabled: enabled, updatedAt: new Date().toISOString() });
+}
+
+export async function setFaithEnabled(enabled: boolean): Promise<void> {
+  if (isSupabaseConfigured) {
+    const supabase = getSupabaseBrowserClient()!;
+    const userId = await requireUserId();
+    const { error } = await supabase.from("profile").update({ faith_enabled: enabled, updated_at: new Date().toISOString() }).eq("id", userId);
+    if (error) throw error;
+    return;
+  }
+  const db = await getDb();
+  const existing = await db.get("profile", LOCAL_PROFILE_ID);
+  if (existing) await db.put("profile", { ...existing, faithEnabled: enabled, updatedAt: new Date().toISOString() });
 }
 
 export async function updateBodyweight(kg: number): Promise<void> {

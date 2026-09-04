@@ -116,13 +116,9 @@ export default function SleepPage() {
         </Card>
       </div>
 
-      <div>
-        <SectionHeader title="Histórico" />
-        {last30.length === 0 ? (
-          <Card raised>
-            <EmptyState title="Todavía no hay registros" description="Tu histórico de sueño aparecerá aquí." />
-          </Card>
-        ) : (
+      {last30.length > 0 ? (
+        <div>
+          <SectionHeader title="Histórico" />
           <div className="flex flex-col gap-2">
             {[...last30].reverse().map((log) => (
               <Card key={log.id} raised className="flex items-center justify-between gap-3">
@@ -145,8 +141,8 @@ export default function SleepPage() {
               </Card>
             ))}
           </div>
-        )}
-      </div>
+        </div>
+      ) : null}
 
       <SleepLogDialog open={dialogDate !== null} onOpenChange={(open) => !open && setDialogDate(null)} date={dialogDate ?? today} existing={dialogExisting} />
     </div>

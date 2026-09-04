@@ -1,26 +1,30 @@
 "use client";
 
-import { Book, Brain, Check, Dumbbell, Moon, Play, Target, UtensilsCrossed, type LucideIcon } from "lucide-react";
+import { Book, Brain, Check, Cross, Dumbbell, Moon, Play, Target, UtensilsCrossed, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ShieldAlert } from "lucide-react";
-import { commitmentsForDay } from "@/features/contract/arc";
+import { useApplyAutoReductions, type DoneDaysByKind } from "@/features/contract/adaptive";
+import { commitmentsForDay, dayOfArc } from "@/features/contract/arc";
+import { useFaithCheckInByDate } from "@/features/faith/hooks";
+import { InstallPrompt } from "@/features/pwa/InstallPrompt";
 import { KIND_HREF, SLOT_LABEL, SLOT_ORDER } from "@/features/contract/catalogue";
 import { useActiveContract, useCommitments } from "@/features/contract/hooks";
+import { popAdaptiveNotices } from "@/features/contract/notices";
 import { useFocusSessions } from "@/features/focus/hooks";
-import { useDailyNutrition } from "@/features/food/hooks";
-import { useJournalEntryByDate } from "@/features/journaling/hooks";
+import { useAllFoodMeals, useDailyNutrition } from "@/features/food/hooks";
+import { useJournalEntries, useJournalEntryByDate } from "@/features/journaling/hooks";
 import { useAddictions, useAllRelapses } from "@/features/addictions/hooks";
 import { currentStreakStartMs } from "@/features/addictions/stats";
 import { useMeditationSessions } from "@/features/meditation/hooks";
 import { useProfile } from "@/features/profile/hooks";
 import { useRoutines } from "@/features/routines/hooks";
 import { sleptMinutes } from "@/features/sleep/calc";
-import { useSleepLogByDate } from "@/features/sleep/hooks";
+import { useSleepLogByDate, useSleepLogs } from "@/features/sleep/hooks";
 import { useActiveSession, useRecentSessions, useStartSession } from "@/features/workouts/hooks";
 import { cn } from "@/lib/cn";
-import { todayKey } from "@/lib/date";
+import { daysBetweenDayKeys, todayKey } from "@/lib/date";
 import { formatHoursMinutes } from "@/lib/duration";
 import type { CommitmentKind } from "@/types/models";
 
@@ -29,6 +33,33 @@ function timeLabelOf(iso: string): { label: string; minutes: number } {
   const h = d.getHours();
   const m = d.getMinutes();
   return { label: `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}`, minutes: h * 60 + m };
+}
+
+const LAST_OPENED_KEY = "veltra:lastOpenedDay";
+
+/** Si han pasado dos días completos sin abrir la app, hoy se activa un modo
+ *  mínimo: un solo bloque en vez del plan entero. Un par de días perdidos no
+ *  tienen por qué convertirse en abandono por sobrecarga al volver. */
+function useReturningAfterGap(today: string): boolean {
+  const [returning, setReturning] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      try {
+        const last = localStorage.getItem(LAST_OPENED_KEY);
+        if (last && daysBetweenDayKeys(last, today) >= 3) setReturning(true);
+        localStorage.setItem(LAST_OPENED_KEY, today);
+      } catch {
+        // localStorage no disponible — nunca activa el modo mínimo, no rompe nada más.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [today]);
+  return returning;
 }
 
 const KIND_ICON: Record<CommitmentKind, LucideIcon> = {
@@ -41,13 +72,16 @@ const KIND_ICON: Record<CommitmentKind, LucideIcon> = {
   habit: Check,
 };
 
+// El morado es exclusivo de la IA (la revisión semanal en Progreso) — aquí
+// serían solo iconos de tipo de compromiso, así que usan el único acento de
+// acción de la app en vez de competir por ese color.
 const KIND_COLOR: Record<CommitmentKind, string> = {
   workout: "text-progress",
   sleep: "text-sleep",
   nutrition: "text-progress",
-  meditation: "text-ai",
-  journaling: "text-ai",
-  focus: "text-ai",
+  meditation: "text-progress",
+  journaling: "text-progress",
+  focus: "text-progress",
   habit: "text-progress",
 };
 
@@ -71,21 +105,62 @@ interface DayItem {
 export default function DashboardPage() {
   const router = useRouter();
   const today = todayKey();
+  const [nowMs] = useState(() => Date.now());
   const { data: contract } = useActiveContract();
   const { data: commitments = [] } = useCommitments(contract?.id ?? null);
   const { data: routines = [] } = useRoutines();
-  const { data: recentSessions = [] } = useRecentSessions(10);
+  // 30 en vez de 10: además de "rutina sugerida" y "sesión de hoy", esta
+  // lista alimenta la detección de fallos de la Fase 5, que mira hasta 3
+  // semanas atrás.
+  const { data: recentSessions = [] } = useRecentSessions(30);
   const { data: activeSession } = useActiveSession();
   const startSession = useStartSession();
 
   const { data: lastNight } = useSleepLogByDate(today);
+  const { data: allSleepLogs = [] } = useSleepLogs();
   const { data: meditationSessions = [] } = useMeditationSessions();
   const { data: todayJournal } = useJournalEntryByDate(today);
+  const { data: allJournalEntries = [] } = useJournalEntries();
   const { data: focusSessions = [] } = useFocusSessions();
   const { data: nutrition } = useDailyNutrition(today);
+  const { data: allMeals = [] } = useAllFoodMeals();
   const { data: profile } = useProfile();
   const { data: addictions = [] } = useAddictions();
   const { data: allRelapses = [] } = useAllRelapses();
+  const { data: faithCheckIn } = useFaithCheckInByDate(today);
+
+  const returning = useReturningAfterGap(today);
+  const [dismissedMinimal, setDismissedMinimal] = useState(false);
+  const minimalMode = returning && !dismissedMinimal;
+
+  const [notices, setNotices] = useState<string[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      const fresh = popAdaptiveNotices();
+      if (fresh.length > 0) setNotices((prev) => [...prev, ...fresh]);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [commitments]);
+
+  // Qué día, por tipo de compromiso, hubo algo registrado — lo que la
+  // Fase 5 necesita para saber si un compromiso lleva 3 fallos seguidos.
+  const doneDaysByKind: DoneDaysByKind = useMemo(
+    () => ({
+      workout: new Set(recentSessions.map((s) => s.startedAt.slice(0, 10))),
+      sleep: new Set(allSleepLogs.map((l) => l.date)),
+      nutrition: new Set(allMeals.map((m) => m.date)),
+      meditation: new Set(meditationSessions.map((s) => s.completedAt.slice(0, 10))),
+      focus: new Set(focusSessions.map((s) => s.completedAt.slice(0, 10))),
+      journaling: new Set(allJournalEntries.map((e) => e.date)),
+    }),
+    [recentSessions, allSleepLogs, allMeals, meditationSessions, focusSessions, allJournalEntries]
+  );
+  useApplyAutoReductions(commitments, doneDaysByKind);
 
   const suggestedRoutine = useMemo(() => {
     if (routines.length === 0) return null;
@@ -106,6 +181,35 @@ export default function DashboardPage() {
 
   const todaysCommitments = useMemo(() => commitmentsForDay(commitments, today), [commitments, today]);
 
+  // Ninguna tarjeta puede ser solo una petición de datos: cuando hoy no hay
+  // nada que registrar, cada una devuelve el agregado de los últimos 7 días
+  // en vez de un "Sin registrar" sin contenido. Si tampoco hay nada en esa
+  // ventana, el agregado es null y la tarjeta se queda en el estado simple.
+  const sleepAvg7dMin = useMemo(() => {
+    const cutoff = nowMs - 7 * 86400000;
+    const inWindow = allSleepLogs.filter((l) => new Date(l.date).getTime() >= cutoff);
+    if (inWindow.length === 0) return null;
+    return Math.round(inWindow.reduce((s, l) => s + sleptMinutes(l), 0) / inWindow.length);
+  }, [allSleepLogs, nowMs]);
+
+  const meditation7dMin = useMemo(() => {
+    const cutoff = nowMs - 7 * 86400000;
+    const total = meditationSessions.filter((s) => new Date(s.completedAt).getTime() >= cutoff).reduce((sum, s) => sum + s.durationMinutes, 0);
+    return total > 0 ? total : null;
+  }, [meditationSessions, nowMs]);
+
+  const focus7dMin = useMemo(() => {
+    const cutoff = nowMs - 7 * 86400000;
+    const total = focusSessions.filter((s) => new Date(s.completedAt).getTime() >= cutoff).reduce((sum, s) => sum + s.durationMinutes, 0);
+    return total > 0 ? total : null;
+  }, [focusSessions, nowMs]);
+
+  const journal7dCount = useMemo(() => {
+    const cutoff = nowMs - 7 * 86400000;
+    const count = allJournalEntries.filter((e) => new Date(e.date).getTime() >= cutoff).length;
+    return count > 0 ? count : null;
+  }, [allJournalEntries, nowMs]);
+
   // Recuperación no es un compromiso del contrato: es una cuenta que corre
   // sola. Solo aparece si el usuario la ha activado en Perfil.
   const cleanDays = useMemo(() => {
@@ -115,6 +219,8 @@ export default function DashboardPage() {
     );
     return Math.max(...days);
   }, [profile?.recoveryEnabled, addictions, allRelapses]);
+
+  const faithDoneCount = (faithCheckIn?.mass ? 1 : 0) + (faithCheckIn?.rosary ? 1 : 0) + (faithCheckIn?.prayer ? 1 : 0) + (faithCheckIn?.examen ? 1 : 0);
 
   const handleStart = async () => {
     if (activeSession) {
@@ -166,26 +272,40 @@ export default function DashboardPage() {
             cta: { label: "Empezar entrenamiento", onClick: handleStart },
           };
         }
-        case "sleep":
+        case "sleep": {
+          const avgLabel = sleepAvg7dMin !== null ? `media 7d: ${formatHoursMinutes(sleepAvg7dMin)}` : null;
           return lastNight
-            ? { ...base, timeLabel: lastNight.riseTime, meta: formatHoursMinutes(sleptMinutes(lastNight)), state: "done", href: undefined }
-            : { ...base, meta: "Sin registrar", state: "pending" };
+            ? {
+                ...base,
+                timeLabel: lastNight.riseTime,
+                meta: avgLabel ? `${formatHoursMinutes(sleptMinutes(lastNight))} · ${avgLabel}` : formatHoursMinutes(sleptMinutes(lastNight)),
+                state: "done",
+                href: undefined,
+              }
+            : { ...base, meta: avgLabel ? `Sin registrar · ${avgLabel}` : "Sin registrar", state: "pending" };
+        }
         case "nutrition":
           return ateToday
             ? { ...base, meta: `${Math.round(nutrition?.calories ?? 0)} kcal registradas`, state: "done", href: undefined }
             : { ...base, meta: "Sin registrar", state: "pending" };
-        case "meditation":
+        case "meditation": {
+          const weekLabel = meditation7dMin !== null ? `7d: ${meditation7dMin} min` : null;
           return meditatedToday
             ? { ...base, timeLabel: timeLabelOf(meditatedToday.completedAt).label, meta: `${meditatedToday.durationMinutes} min`, state: "done", href: undefined }
-            : { ...base, meta: "Sin registrar", state: "pending" };
-        case "journaling":
+            : { ...base, meta: weekLabel ? `Sin registrar · ${weekLabel}` : "Sin registrar", state: "pending" };
+        }
+        case "journaling": {
+          const weekLabel = journal7dCount !== null ? `${journal7dCount} ${journal7dCount === 1 ? "entrada" : "entradas"} esta semana` : null;
           return todayJournal
             ? { ...base, timeLabel: timeLabelOf(todayJournal.createdAt).label, meta: "Entrada de hoy", state: "done", href: undefined }
-            : { ...base, meta: "Sin escribir", state: "pending" };
-        case "focus":
+            : { ...base, meta: weekLabel ? `Sin escribir · ${weekLabel}` : "Sin escribir", state: "pending" };
+        }
+        case "focus": {
+          const weekLabel = focus7dMin !== null ? `7d: ${focus7dMin} min` : null;
           return focusedToday
             ? { ...base, timeLabel: timeLabelOf(focusedToday.completedAt).label, meta: `${focusedToday.durationMinutes} min`, state: "done", href: undefined }
-            : { ...base, meta: "Sin empezar", state: "pending" };
+            : { ...base, meta: weekLabel ? `Sin empezar · ${weekLabel}` : "Sin empezar", state: "pending" };
+        }
         default:
           // Los hábitos propios se marcan en su módulo: aquí solo se recuerda
           // que tocan hoy.
@@ -193,27 +313,78 @@ export default function DashboardPage() {
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [todaysCommitments, activeSession, completedSessionToday, suggestedRoutine, lastNight, ateToday, nutrition, meditatedToday, todayJournal, focusedToday, router]);
+  }, [
+    todaysCommitments,
+    activeSession,
+    completedSessionToday,
+    suggestedRoutine,
+    lastNight,
+    sleepAvg7dMin,
+    ateToday,
+    nutrition,
+    meditatedToday,
+    meditation7dMin,
+    todayJournal,
+    journal7dCount,
+    focusedToday,
+    focus7dMin,
+    router,
+  ]);
 
   const sorted = useMemo(() => [...items].sort((a, b) => a.order - b.order), [items]);
+  const visibleItems = minimalMode ? sorted.slice(0, 1) : sorted;
   const doneCount = items.filter((i) => i.state === "done").length;
+  const arcDay = contract ? dayOfArc(contract, today) : null;
 
   return (
     <div className="flex flex-col gap-6">
+      {notices.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {notices.map((text, i) => (
+            <div key={i} className="flex items-start gap-2.5 border border-line-subtle rounded-xl bg-bg-soft px-3.5 py-3">
+              <p className="text-ink-dim text-xs leading-5 flex-1">{text}</p>
+              <button
+                onClick={() => setNotices((prev) => prev.filter((_, idx) => idx !== i))}
+                className="text-ink-faint hover:text-ink shrink-0"
+                aria-label="Descartar"
+              >
+                <X size={14} />
+              </button>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
       <div>
         <div className="flex items-end justify-between mb-2">
           <h1 className="text-ink font-display font-semibold text-[26px] leading-tight tracking-tight">Tu día</h1>
-          <span className="text-ink-faint text-xs font-semibold">
-            {doneCount} de {items.length}
-          </span>
+          {arcDay !== null ? (
+            <span className="text-ink-faint text-xs font-semibold">
+              Día {arcDay} de {contract!.durationDays}
+            </span>
+          ) : items.length > 0 ? (
+            <span className="text-ink-faint text-xs font-semibold">
+              {doneCount} de {items.length}
+            </span>
+          ) : null}
         </div>
         <div className="h-[2px] bg-[#1B1B1E]">
           <div
             className="h-[2px] bg-progress transition-all"
-            style={{ width: `${items.length === 0 ? 0 : Math.round((doneCount / items.length) * 100)}%` }}
+            style={{ width: `${arcDay !== null ? Math.round((arcDay / contract!.durationDays) * 100) : items.length === 0 ? 0 : Math.round((doneCount / items.length) * 100)}%` }}
           />
         </div>
       </div>
+
+      {minimalMode && sorted.length > 0 && contract?.why ? (
+        <div className="border border-line-subtle rounded-2xl bg-surface px-4 py-4">
+          <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em]">Llevabas unos días fuera</p>
+          <p className="text-ink text-sm mt-2 leading-5">&ldquo;{contract.why}&rdquo;</p>
+          <button onClick={() => setDismissedMinimal(true)} className="text-ink-faint text-xs font-semibold mt-3.5 underline underline-offset-2">
+            Ver el plan completo de hoy
+          </button>
+        </div>
+      ) : null}
 
       {sorted.length === 0 ? (
         <p className="text-ink-dim text-sm">Hoy no toca ninguno de tus compromisos. Descansar también es parte del plan.</p>
@@ -221,13 +392,13 @@ export default function DashboardPage() {
         <div className="relative pl-6">
           <span className="absolute left-[5px] top-1.5 bottom-1.5 w-px bg-gradient-to-b from-transparent via-line to-transparent" />
           <div className="flex flex-col gap-5">
-            {sorted.map((it) => {
+            {visibleItems.map((it) => {
               const Icon = it.icon;
               const card = (
                 <div
                   className={cn(
-                    "rounded-[14px] p-4",
-                    it.state === "now" ? "border border-progress/25 bg-gradient-to-b from-[#121614] to-[#0E0F0E]" : "border border-line-subtle bg-[#0E0E0E]"
+                    "rounded-2xl p-4",
+                    it.state === "now" ? "border border-progress/25 bg-progress-bg" : "border border-line-subtle bg-bg-soft"
                   )}
                 >
                   <div className="flex items-center gap-3">
@@ -283,7 +454,7 @@ export default function DashboardPage() {
       {cleanDays !== null ? (
         <Link
           href="/addictions"
-          className="flex items-center gap-3 border border-line-subtle rounded-[14px] bg-[#0E0E0E] p-4 hover:border-line transition-colors"
+          className="flex items-center gap-3 border border-line-subtle rounded-2xl bg-bg-soft p-4 hover:border-line transition-colors"
         >
           <ShieldAlert size={16} className="text-addiction shrink-0" />
           <div className="flex-1 min-w-0">
@@ -294,6 +465,18 @@ export default function DashboardPage() {
           </div>
         </Link>
       ) : null}
+
+      {profile?.faithEnabled ? (
+        <Link href="/faith" className="flex items-center gap-3 border border-line-subtle rounded-2xl bg-bg-soft p-4 hover:border-line transition-colors">
+          <Cross size={16} className="text-progress shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-ink text-[15px] font-display font-semibold">Fe</p>
+            <p className="text-ink-faint text-xs mt-0.5">{faithDoneCount} de 4 hoy</p>
+          </div>
+        </Link>
+      ) : null}
+
+      <InstallPrompt eligible={arcDay !== null && arcDay >= 2} />
     </div>
   );
 }

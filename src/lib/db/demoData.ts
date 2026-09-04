@@ -106,6 +106,7 @@ export async function seedDemoData(db: IDBPDatabase<VeltraDB>) {
     onboardingCompleted: true,
     targetWeightKg: null,
     recoveryEnabled: false,
+    faithEnabled: false,
     createdAt: nowIso,
     updatedAt: nowIso,
   });

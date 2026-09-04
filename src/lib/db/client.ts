@@ -77,6 +77,12 @@ export function getDb(): Promise<IDBPDatabase<VeltraDB>> {
             db.deleteObjectStore("pushSubscriptions" as never);
           }
         }
+        if (oldVersion < 8) {
+          db.createObjectStore("weeklyReviews", { keyPath: "id" }).createIndex("contractId", "contractId");
+        }
+        if (oldVersion < 9) {
+          db.createObjectStore("faithCheckins", { keyPath: "id" }).createIndex("date", "date");
+        }
       },
     }).then(async (db) => {
       await seedExerciseLibrary(db);

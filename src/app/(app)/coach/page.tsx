@@ -65,7 +65,7 @@ export default function CoachListPage() {
       ) : (
         <div className="flex flex-col gap-2.5">
           {conversations.map((conv) => (
-            <div key={conv.id} className="relative rounded-3xl border border-line-subtle bg-surface-raised p-5">
+            <Card key={conv.id} raised className="relative">
               <Link href={`/coach/${conv.id}`} className="block pr-8">
                 <div className="flex items-center gap-1.5">
                   {conv.pinned ? <Bookmark size={12} className="text-ai fill-ai" /> : null}
@@ -101,7 +101,7 @@ export default function CoachListPage() {
                   </button>
                 </div>
               ) : null}
-            </div>
+            </Card>
           ))}
         </div>
       )}

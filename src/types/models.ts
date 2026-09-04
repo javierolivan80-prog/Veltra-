@@ -67,6 +67,8 @@ export interface Profile {
   /** Recuperación no está en la navegación: se activa aquí y entonces
    *  aparece como bloque en Hoy. */
   recoveryEnabled: boolean;
+  /** Fe católica — mismo patrón que Recuperación: opcional, se activa aquí. */
+  faithEnabled: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -534,6 +536,55 @@ export interface Commitment {
   days: number[];
   timeSlot: TimeSlot;
   position: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Revisión semanal — cada domingo, un resumen de la semana, un patrón si
+// hay datos para afirmarlo, y como mucho una propuesta de cambio al plan.
+// ---------------------------------------------------------------------
+
+export type ReviewProposalStatus = "pending" | "accepted" | "kept" | "none";
+export type ReviewGeneratedBy = "ai" | "rules";
+
+/** El único cambio concreto que una revisión puede proponer: la frecuencia
+ *  o la franja de un compromiso. Nunca más de una propuesta por revisión. */
+export interface ReviewProposal {
+  commitmentId: string;
+  title: string;
+  currentDays: number[];
+  proposedDays: number[];
+  proposedTimeSlot: TimeSlot;
+  reason: string;
+}
+
+export interface WeeklyReview {
+  id: string;
+  contractId: string;
+  /** Day-key (YYYY-MM-DD) del primer día de la semana revisada. */
+  weekStart: string;
+  summary: string;
+  pattern: string | null;
+  proposal: ReviewProposal | null;
+  proposalStatus: ReviewProposalStatus;
+  generatedBy: ReviewGeneratedBy;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Fe católica — un check-in por día, opcional (ver Profile.faithEnabled).
+// El examen de conciencia es texto libre y privado: sin categorías fijas
+// de faltas, cada uno lo escribe a su manera.
+// ---------------------------------------------------------------------
+
+export interface FaithCheckIn {
+  id: string;
+  date: string;
+  mass: boolean;
+  rosary: boolean;
+  prayer: boolean;
+  examen: string;
   createdAt: string;
   updatedAt: string;
 }

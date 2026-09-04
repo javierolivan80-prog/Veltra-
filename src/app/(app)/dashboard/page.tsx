@@ -7,9 +7,11 @@ import { useEffect, useMemo, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { useApplyAutoReductions, type DoneDaysByKind } from "@/features/contract/adaptive";
 import { commitmentsForDay, dayOfArc } from "@/features/contract/arc";
+import { computePlanStreak } from "@/features/contract/streak";
 import { useFaithCheckInByDate } from "@/features/faith/hooks";
 import { useInsights } from "@/features/insights/hooks";
 import { InstallPrompt } from "@/features/pwa/InstallPrompt";
+import { PlanCelebration } from "@/design-system/components/PlanCelebration";
 import { KIND_HREF, SLOT_LABEL, SLOT_ORDER } from "@/features/contract/catalogue";
 import { useActiveContract, useCommitments } from "@/features/contract/hooks";
 import { popAdaptiveNotices } from "@/features/contract/notices";
@@ -37,6 +39,7 @@ function timeLabelOf(iso: string): { label: string; minutes: number } {
 }
 
 const LAST_OPENED_KEY = "veltra:lastOpenedDay";
+const PLAN_CELEBRATED_KEY = "veltra:planCelebratedDay";
 
 /** Si han pasado dos días completos sin abrir la app, hoy se activa un modo
  *  mínimo: un solo bloque en vez del plan entero. Un par de días perdidos no
@@ -338,6 +341,28 @@ export default function DashboardPage() {
   const doneCount = items.filter((i) => i.state === "done").length;
   const arcDay = contract ? dayOfArc(contract, today) : null;
 
+  // El día completo se celebra una vez y ya: recargar Hoy después no vuelve
+  // a lanzarlo, porque entonces dejaría de ser un momento y sería un cartel.
+  const [celebratedStreak, setCelebratedStreak] = useState<number | null>(null);
+  useEffect(() => {
+    if (items.length === 0 || doneCount < items.length) return;
+    let cancelled = false;
+    (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      try {
+        if (localStorage.getItem(PLAN_CELEBRATED_KEY) === today) return;
+        localStorage.setItem(PLAN_CELEBRATED_KEY, today);
+      } catch {
+        // Sin localStorage se celebra igual; como mucho se repetiría al recargar.
+      }
+      setCelebratedStreak(computePlanStreak(commitments, doneDaysByKind, contract?.startedOn ?? today, today));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [items.length, doneCount, today, commitments, doneDaysByKind, contract?.startedOn]);
+
   return (
     <div className="flex flex-col gap-6">
       {notices.length > 0 ? (
@@ -495,6 +520,8 @@ export default function DashboardPage() {
       ) : null}
 
       <InstallPrompt eligible={arcDay !== null && arcDay >= 2} />
+
+      <PlanCelebration streak={celebratedStreak} onDismiss={() => setCelebratedStreak(null)} />
     </div>
   );
 }

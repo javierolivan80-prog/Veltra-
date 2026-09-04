@@ -73,3 +73,36 @@ navegador. Crea (o edita) un hábito con la hora de notificación puesta a
 con la pestaña cerrada.
 
 Para desactivar el cron más adelante: `select cron.unschedule('send-habit-reminders');`
+
+## 6. Aviso de racha en riesgo (opcional, misma infraestructura)
+
+Segunda función, independiente de la anterior: cada día a las 20:30 (hora
+local de cada usuario, tomada de sus hábitos), si alguno lleva racha de 3
+días o más y hoy todavía no está marcado, manda un único push avisando.
+Usa los mismos secretos VAPID ya configurados en el paso 3 — no hace falta
+repetirlos.
+
+```
+supabase functions deploy send-streak-nudges
+```
+
+Y el cron, igual que el paso 4 pero apuntando a esta función:
+
+```sql
+select cron.schedule(
+  'send-streak-nudges',
+  '* * * * *',
+  $$
+  select net.http_post(
+    url := 'https://<project-ref>.supabase.co/functions/v1/send-streak-nudges',
+    headers := jsonb_build_object('Authorization', 'Bearer <anon-key>', 'Content-Type', 'application/json'),
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
+
+Para probarlo sin esperar al final del día, cambia `NUDGE_TIME` en
+`supabase/functions/send-streak-nudges/index.ts` a 1-2 minutos en el futuro,
+redespliega, y responde "Sí" a un hábito 3 días seguidos primero (sin racha
+no hay nada que avisar). Para desactivar: `select cron.unschedule('send-streak-nudges');`

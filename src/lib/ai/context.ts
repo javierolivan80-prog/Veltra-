@@ -5,6 +5,7 @@ import { getSetsForExercise, listRecentSessions, getExerciseIdsInSession } from 
 import { listMemoryFacts } from "@/features/coach/repo";
 import { dayKey } from "@/features/food/dates";
 import { getDailyNutrition, getNutritionGoals } from "@/features/food/repo";
+import { computeInsights } from "@/features/insights/signals";
 import { getProfile, listInjuries } from "@/features/profile/repo";
 import { weeklyFrequency } from "@/features/exercises/stats";
 import type { Exercise } from "@/types/models";
@@ -17,6 +18,7 @@ export interface CoachContext {
   strongestLifts: string;
   laggingMuscleGroups: string;
   nutritionSummary: string;
+  wellbeingSummary: string;
 }
 
 /**
@@ -61,18 +63,34 @@ async function buildNutritionSummary(): Promise<string> {
 }
 
 /**
+ * Cruces entre sueño, ánimo y actividad (features/insights) — el mismo
+ * cálculo que la tarjeta "Patrón detectado" de Hoy, para que el coach ya
+ * conozca el patrón sin que el usuario tenga que repetírselo en el chat.
+ */
+async function buildWellbeingSummary(): Promise<string> {
+  try {
+    const insights = await computeInsights();
+    if (insights.length === 0) return "Sin patrones claros todavía entre sueño, ánimo y actividad (hace falta más historial para afirmar algo).";
+    return insights.map((i) => `- ${i.text}`).join("\n");
+  } catch {
+    return "Sin datos de bienestar disponibles.";
+  }
+}
+
+/**
  * Assembles the same grounded context both the edge-function prompt and the
  * offline fallback coach use — the single place that decides what the AI is
  * "allowed to know" about the user, so it never has to invent anything.
  */
 export async function buildCoachContext(): Promise<CoachContext> {
-  const [profile, injuries, memory, recentSessions, exercises, nutritionSummary] = await Promise.all([
+  const [profile, injuries, memory, recentSessions, exercises, nutritionSummary, wellbeingSummary] = await Promise.all([
     getProfile(),
     listInjuries(),
     listMemoryFacts(),
     listRecentSessions(8),
     listExercises(),
     buildNutritionSummary(),
+    buildWellbeingSummary(),
   ]);
 
   const profileSummary = profile
@@ -110,7 +128,7 @@ export async function buildCoachContext(): Promise<CoachContext> {
   }
   const strongestLifts = prSummaries.join(" | ") || "Sin PRs todavía.";
 
-  return { profileSummary, injuriesSummary, memorySummary, recentSessionsSummary, strongestLifts, laggingMuscleGroups, nutritionSummary };
+  return { profileSummary, injuriesSummary, memorySummary, recentSessionsSummary, strongestLifts, laggingMuscleGroups, nutritionSummary, wellbeingSummary };
 }
 
 export async function suggestNextWeight(exerciseId: string): Promise<{ weight: number; reps: number; reasoning: string } | null> {

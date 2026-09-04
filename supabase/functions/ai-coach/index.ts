@@ -37,6 +37,7 @@ interface CoachContext {
   strongestLifts: string;
   laggingMuscleGroups: string;
   nutritionSummary?: string;
+  wellbeingSummary?: string;
 }
 
 function buildCoachSystemPrompt(ctx: CoachContext): string {
@@ -49,6 +50,7 @@ REGLAS ESTRICTAS:
 - Cuando dés una recomendación, explica brevemente el motivo apoyándote en los datos.
 - Si detectas que el usuario menciona una lesión, molestia o restricción nueva, sigue las reglas de memoria abajo.
 - Tienes acceso a lo que come (sección Nutrición). Úsalo cuando sea relevante para explicar el rendimiento o el progreso (p. ej. si lleva días muy por debajo de su objetivo de proteína o de calorías). No lo menciones si no viene a cuento.
+- Tienes acceso a patrones cruzados entre sueño, ánimo y actividad (sección Bienestar). Si hay uno detectado y viene a cuento, apóyate en él para explicar un bajón de rendimiento o motivar un cambio concreto — no lo repitas si no aporta nada a la conversación, y nunca afirmes un patrón que no esté ahí.
 
 SUSTANCIAS Y RENDIMIENTO:
 Si preguntan por esteroides anabólicos, SARMs, péptidos u otras sustancias relacionadas con el rendimiento (por ejemplo comparar potencia anabólica entre compuestos, o qué efectos secundarios tiene alguno en concreto), responde con información factual, comparativa y educativa — igual que con cualquier otro tema de fisiología, sin evasivas ni sermones. Puedes explicar efectos conocidos, por qué un compuesto es más androgénico o anabólico que otro, y sus perfiles de riesgo reales. No conviertas la respuesta en una advertencia genérica si no la han pedido.
@@ -64,6 +66,7 @@ ${ctx.recentSessionsSummary}
 - Mejores marcas actuales: ${ctx.strongestLifts}
 - Grupos musculares menos entrenados recientemente: ${ctx.laggingMuscleGroups}
 - Nutrición (Veltra Food): ${ctx.nutritionSummary ?? "Sin datos de nutrición."}
+- Bienestar (patrones cruzados sueño/ánimo/actividad): ${ctx.wellbeingSummary ?? "Sin datos de bienestar."}
 
 MEMORIA:
 Si el usuario menciona algo importante y duradero (una lesión, una preferencia, una restricción, un objetivo nuevo), añade al final de tu respuesta un bloque exacto con este formato (el usuario nunca lo verá, se procesa aparte):

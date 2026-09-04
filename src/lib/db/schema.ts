@@ -16,12 +16,10 @@ import type {
   FoodConversation,
   FoodMeal,
   FoodMessage,
-  GoalCheckpoint,
   Habit,
   HabitLog,
   Injury,
   JournalEntry,
-  LifeGoal,
   MealCheck,
   MeditationSession,
   MemoryFact,
@@ -40,7 +38,7 @@ import type {
 } from "@/types/models";
 
 export const DB_NAME = "veltra";
-export const DB_VERSION = 9;
+export const DB_VERSION = 10;
 
 /** Single-row store for the local nutrition goals — mirrors the per-user Supabase row. */
 export type StoredNutritionGoals = NutritionGoals & { id: string };
@@ -89,8 +87,6 @@ export interface VeltraDB extends DBSchema {
   screenTimeLogs: { key: string; value: ScreenTimeLog; indexes: { date: string } };
   expenses: { key: string; value: Expense; indexes: { date: string } };
   financeGoals: { key: string; value: StoredFinanceGoals };
-  goals: { key: string; value: LifeGoal };
-  goalCheckpoints: { key: string; value: GoalCheckpoint; indexes: { goalId: string } };
   dailyMoods: { key: string; value: DailyMood; indexes: { date: string } };
   contracts: { key: string; value: Contract; indexes: { status: string } };
   commitments: { key: string; value: Commitment; indexes: { contractId: string } };
@@ -129,8 +125,6 @@ export const STORE_NAMES = [
   "screenTimeLogs",
   "expenses",
   "financeGoals",
-  "goals",
-  "goalCheckpoints",
   "dailyMoods",
   "contracts",
   "commitments",

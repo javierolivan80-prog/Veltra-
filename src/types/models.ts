@@ -469,30 +469,6 @@ export interface FinanceGoals {
 }
 
 // ---------------------------------------------------------------------
-// Vida — Metas a largo plazo.
-// ---------------------------------------------------------------------
-
-/** A long-term personal goal (Vida). Named `LifeGoal` to avoid colliding with
- *  the training `Goal` type ("strength" | "hypertrophy" | ...) above. */
-export interface LifeGoal {
-  id: string;
-  name: string;
-  description: string | null;
-  targetDate: string | null; // ISO date (YYYY-MM-DD)
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface GoalCheckpoint {
-  id: string;
-  goalId: string;
-  name: string;
-  done: boolean;
-  position: number;
-  createdAt: string;
-}
-
-// ---------------------------------------------------------------------
 // El contrato — el arco de 30/60/90 días que el usuario firma al empezar.
 // Un contrato activo por usuario; sus compromisos son lo que arma el plan
 // diario de Hoy.

@@ -74,10 +74,18 @@ function gospelTitle(citation: string | null): string {
  * falla o el marcador no aparece, null — el cliente cae a un enlace directo
  * a la fuente, nunca se queda en blanco ni inventa contenido.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  // Modo temporal para depurar en producción sin acceso a los logs de
+  // Vercel: /api/gospel?debug=1 devuelve por qué falló en vez de null.
+  // TODO: quitar esta rama una vez confirmado que la extracción es estable.
+  const debug = new URL(request.url).searchParams.get("debug") === "1";
+
   try {
-    const res = await fetch(SOURCE_URL, { headers: { "User-Agent": "Mozilla/5.0 (compatible; VeltraBot/1.0)" }, next: { revalidate } });
-    if (!res.ok) return NextResponse.json(null);
+    const res = await fetch(SOURCE_URL, { headers: { "User-Agent": "Mozilla/5.0 (compatible; VeltraBot/1.0)" }, cache: "no-store" });
+    if (!res.ok) {
+      if (debug) return NextResponse.json({ step: "fetch", ok: false, status: res.status, statusText: res.statusText });
+      return NextResponse.json(null);
+    }
 
     const html = await res.text();
     const $ = cheerio.load(html);
@@ -85,7 +93,10 @@ export async function GET() {
     const bodyText = decodeEntities($("body").text());
 
     const gospelMarker = bodyText.match(GOSPEL_MARKER_RE);
-    if (!gospelMarker || gospelMarker.index === undefined) return NextResponse.json(null);
+    if (!gospelMarker || gospelMarker.index === undefined) {
+      if (debug) return NextResponse.json({ step: "marker", htmlLength: html.length, bodyTextLength: bodyText.length, bodyTextSample: bodyText.slice(0, 1500) });
+      return NextResponse.json(null);
+    }
 
     const citation = gospelMarker[1].trim();
     const rest = bodyText.slice(gospelMarker.index + gospelMarker[0].length);
@@ -105,11 +116,15 @@ export async function GET() {
       commentaryAuthor = null;
     }
 
-    if (!gospelText) return NextResponse.json(null);
+    if (!gospelText) {
+      if (debug) return NextResponse.json({ step: "empty-gospel-text", citation, restSample: rest.slice(0, 1500) });
+      return NextResponse.json(null);
+    }
 
     const gospel: DailyGospel = { title: gospelTitle(citation), citation, gospelText, commentary, commentaryAuthor, sourceUrl: SOURCE_URL };
     return NextResponse.json(gospel);
-  } catch {
+  } catch (err) {
+    if (debug) return NextResponse.json({ step: "exception", message: err instanceof Error ? err.message : String(err) });
     return NextResponse.json(null);
   }
 }

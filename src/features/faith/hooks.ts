@@ -2,6 +2,7 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type { DailyGospel } from "@/app/api/gospel/route";
+import { todayKey } from "@/lib/date";
 import * as repo from "./repo";
 import type { FaithCheckInPatch } from "./repo";
 
@@ -28,10 +29,12 @@ export function useUpsertFaithCheckIn() {
 }
 
 /** Mismo contenido para todo el mundo — una petición cada varias horas
- *  basta, la ruta ya lo cachea en el servidor por su cuenta. */
+ *  basta, la ruta ya lo cachea en el servidor por su cuenta. Clave por día:
+ *  si no, un fallo pasajero (o el de ayer) se queda cacheado en localStorage
+ *  hasta cumplirse la hora, en vez de reintentarse al cambiar de día. */
 export function useDailyGospel() {
   return useQuery({
-    queryKey: ["dailyGospel"],
+    queryKey: ["dailyGospel", todayKey()],
     queryFn: async (): Promise<DailyGospel | null> => {
       const res = await fetch("/api/gospel");
       if (!res.ok) return null;

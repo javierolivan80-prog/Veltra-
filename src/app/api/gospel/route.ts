@@ -39,7 +39,7 @@ function decodeEntities(text: string): string {
 // evangelio o el comentario en el primer indicio de que ha empezado ese
 // relleno de la página, en vez de arrastrarlo entero.
 const BOILERPLATE_RE =
-  /(Síguenos en|Sobre nosotros|Nuestra Difusión|Recursos\b|Newsletters?|Donativos|Todos los derechos|Política de (privacidad|cookies)|Aviso legal|Suscripción\b|Calendario Perpetuo|Idioma:)/i;
+  /(Síguenos en|Sobre nosotros|Nuestra Difusión|Recursos\b|Newsletters?|Donativos|Todos los derechos|Política de (privacidad|cookies)|Aviso legal|Suscripción\b|Suscríbete|Calendario Perpetuo|Idioma:|Cerrar\b|¿Sabes cómo se financia|Recíbelo gratis|Vídeo del Evangelio y comentario|¿Quiénes somos|¿Qué es evangeli\.net)/i;
 
 function cutAtBoilerplate(text: string): string {
   const match = text.match(BOILERPLATE_RE);
@@ -75,13 +75,12 @@ function gospelTitle(citation: string | null): string {
  * a la fuente, nunca se queda en blanco ni inventa contenido.
  */
 export async function GET(request: Request) {
-  // Modo temporal para depurar en producción sin acceso a los logs de
-  // Vercel: /api/gospel?debug=1 devuelve por qué falló en vez de null.
-  // TODO: quitar esta rama una vez confirmado que la extracción es estable.
+  // Sin acceso a los logs de Vercel desde aquí: /api/gospel?debug=1 devuelve
+  // en qué paso falló en vez de null, para poder depurar en producción.
   const debug = new URL(request.url).searchParams.get("debug") === "1";
 
   try {
-    const res = await fetch(SOURCE_URL, { headers: { "User-Agent": "Mozilla/5.0 (compatible; VeltraBot/1.0)" }, cache: "no-store" });
+    const res = await fetch(SOURCE_URL, { headers: { "User-Agent": "Mozilla/5.0 (compatible; VeltraBot/1.0)" }, next: { revalidate } });
     if (!res.ok) {
       if (debug) return NextResponse.json({ step: "fetch", ok: false, status: res.status, statusText: res.statusText });
       return NextResponse.json(null);

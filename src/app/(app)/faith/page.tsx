@@ -6,6 +6,7 @@ import { Card } from "@/design-system/components/Card";
 import { CategoryBackLink } from "@/design-system/components/CategoryBackLink";
 import { SectionHeader } from "@/design-system/components/SectionHeader";
 import { useDailyGospel, useFaithCheckInByDate, useUpsertFaithCheckIn } from "@/features/faith/hooks";
+import { examenPrompt } from "@/features/faith/prompts";
 import { cn } from "@/lib/cn";
 import { todayFullLabel, todayKey } from "@/lib/date";
 import type { FaithCheckIn } from "@/types/models";
@@ -116,7 +117,7 @@ export default function FaithPage() {
             value={examen}
             onChange={(e) => setExamenEdit(e.target.value)}
             onBlur={saveExamen}
-            placeholder="¿En qué has fallado hoy? Escríbelo con confianza."
+            placeholder={examenPrompt(today)}
             rows={5}
             className="w-full bg-transparent text-ink text-sm leading-6 resize-none outline-none placeholder:text-ink-faint"
           />

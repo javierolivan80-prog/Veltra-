@@ -1,6 +1,6 @@
 "use client";
 
-import { Book, Brain, Check, Cross, Dumbbell, Moon, Play, Target, UtensilsCrossed, X, type LucideIcon } from "lucide-react";
+import { Book, Brain, Check, Cross, Dumbbell, Lightbulb, Moon, Play, Target, UtensilsCrossed, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
@@ -8,6 +8,7 @@ import { ShieldAlert } from "lucide-react";
 import { useApplyAutoReductions, type DoneDaysByKind } from "@/features/contract/adaptive";
 import { commitmentsForDay, dayOfArc } from "@/features/contract/arc";
 import { useFaithCheckInByDate } from "@/features/faith/hooks";
+import { useInsights } from "@/features/insights/hooks";
 import { InstallPrompt } from "@/features/pwa/InstallPrompt";
 import { KIND_HREF, SLOT_LABEL, SLOT_ORDER } from "@/features/contract/catalogue";
 import { useActiveContract, useCommitments } from "@/features/contract/hooks";
@@ -128,6 +129,7 @@ export default function DashboardPage() {
   const { data: addictions = [] } = useAddictions();
   const { data: allRelapses = [] } = useAllRelapses();
   const { data: faithCheckIn } = useFaithCheckInByDate(today);
+  const { data: insights = [] } = useInsights();
 
   const returning = useReturningAfterGap(today);
   const [dismissedMinimal, setDismissedMinimal] = useState(false);
@@ -464,6 +466,22 @@ export default function DashboardPage() {
             <p className="text-ink-faint text-xs mt-0.5">sin recaer</p>
           </div>
         </Link>
+      ) : null}
+
+      {insights.length > 0 ? (
+        <div className="flex flex-col gap-2.5">
+          {insights.map((insight) => (
+            <div key={insight.id} className="flex items-start gap-3 border border-line-subtle rounded-2xl bg-bg-soft p-4">
+              <span className="w-9 h-9 rounded-full bg-progress/15 flex items-center justify-center shrink-0">
+                <Lightbulb size={16} className="text-progress" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em]">Patrón detectado</p>
+                <p className="text-ink-dim text-sm mt-1.5 leading-6">{insight.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       ) : null}
 
       {profile?.faithEnabled ? (

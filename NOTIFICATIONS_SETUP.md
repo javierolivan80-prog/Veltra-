@@ -106,3 +106,52 @@ Para probarlo sin esperar al final del día, cambia `NUDGE_TIME` en
 `supabase/functions/send-streak-nudges/index.ts` a 1-2 minutos en el futuro,
 redespliega, y responde "Sí" a un hábito 3 días seguidos primero (sin racha
 no hay nada que avisar). Para desactivar: `select cron.unschedule('send-streak-nudges');`
+
+## 7. Aviso de compromiso del contrato a punto de reducirse
+
+Tercera función. Misma idea que el paso 6, pero para los compromisos del
+contrato (entrenar, dormir, meditar…) en vez de hábitos propios: si un
+compromiso lleva 2 días marcados seguidos sin cumplirse y hoy tampoco está
+hecho, avisa citando el "por qué" del contrato — un día antes de que
+`detectAutoReductions` reduzca la frecuencia sola al llegar a 3.
+
+Necesita la migración 0013 (`profile.timezone`) aplicada primero — sin
+zona horaria en el perfil, la función no tiene ningún usuario que
+considerar "due":
+
+```
+supabase db push
+```
+
+La zona horaria se captura sola la próxima vez que el usuario guarde su
+perfil (onboarding, o abrir y guardar Perfil una vez) — no hace falta que
+haga nada especial, solo que la app la guarde una vez.
+
+Despliegue, mismos secretos VAPID del paso 3:
+
+```
+supabase functions deploy send-commitment-nudges
+```
+
+Y el cron:
+
+```sql
+select cron.schedule(
+  'send-commitment-nudges',
+  '* * * * *',
+  $$
+  select net.http_post(
+    url := 'https://<project-ref>.supabase.co/functions/v1/send-commitment-nudges',
+    headers := jsonb_build_object('Authorization', 'Bearer <anon-key>', 'Content-Type', 'application/json'),
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
+
+Para probarlo: cambia `NUDGE_TIME` en
+`supabase/functions/send-commitment-nudges/index.ts` a 1-2 minutos en el
+futuro, redespliega, y deja un compromiso sin marcar 2 días seguidos
+primero (con 0 o 1 fallo no hay nada que avisar todavía — y con 3 ya lo
+absorbe la reducción automática antes de llegar aquí). Para desactivar:
+`select cron.unschedule('send-commitment-nudges');`

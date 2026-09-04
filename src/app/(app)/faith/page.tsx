@@ -66,6 +66,7 @@ export default function FaithPage() {
               <div className="mt-4 pt-4 border-t border-line-subtle">
                 <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em]">Comentario</p>
                 <p className="text-ink-dim text-sm mt-2.5 leading-6 whitespace-pre-line">{gospel.commentary}</p>
+                {gospel.commentaryAuthor ? <p className="text-ink-faint text-xs mt-2.5">— {gospel.commentaryAuthor}</p> : null}
               </div>
             ) : null}
           </>

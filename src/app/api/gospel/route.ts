@@ -14,10 +14,14 @@ export interface DailyGospel {
   gospelText: string | null;
   /** Comentario/reflexión que acompaña al evangelio, si la fuente lo separa. */
   commentary: string | null;
+  /** Autor del comentario tal y como lo firma la fuente, p. ej. "Rev. D. Nombre (Ciudad, País)". */
+  commentaryAuthor: string | null;
   sourceUrl: string;
 }
 
 const MAX_SECTION_CHARS = 4000;
+
+const BOOK_NAMES: Record<string, string> = { Mt: "san Mateo", Mc: "san Marcos", Lc: "san Lucas", Jn: "san Juan" };
 
 function decodeEntities(text: string): string {
   return text
@@ -30,30 +34,45 @@ function decodeEntities(text: string): string {
     .trim();
 }
 
+// evangeli.net repite el menú y el pie de página como texto plano fuera de
+// <nav>/<footer>, así que quitar esas etiquetas no basta — se corta el
+// evangelio o el comentario en el primer indicio de que ha empezado ese
+// relleno de la página, en vez de arrastrarlo entero.
+const BOILERPLATE_RE =
+  /(Síguenos en|Sobre nosotros|Nuestra Difusión|Recursos\b|Newsletters?|Donativos|Todos los derechos|Política de (privacidad|cookies)|Aviso legal|Suscripción\b|Calendario Perpetuo|Idioma:)/i;
+
+function cutAtBoilerplate(text: string): string {
+  const match = text.match(BOILERPLATE_RE);
+  if (match && match.index !== undefined && match.index > 30) return text.slice(0, match.index).trim();
+  return text.trim();
+}
+
 function truncate(text: string): string {
   if (text.length <= MAX_SECTION_CHARS) return text;
   return `${text.slice(0, MAX_SECTION_CHARS).trimEnd()}…`;
 }
 
-const CITATION_RE = /((?:Mateo|Marcos|Lucas|Juan|Mt|Mc|Lc|Jn)\.?\s+\d{1,3}\s*,\s*[\d,\-.\s]+\d)/i;
+// El texto del evangelio empieza justo tras este rótulo fijo de la página,
+// con la cita bíblica entre paréntesis — es texto de plantilla del sitio,
+// no contenido que cambie día a día.
+const GOSPEL_MARKER_RE = /Texto del Evangelio\s*\(([^)]+)\)\s*:?/i;
 
-// Candidatos de contenedor de más a menos específico. No podemos verificar el
-// marcado real de evangeli.net desde este entorno (la red saliente lo
-// bloquea), así que se prueban varios y se queda el primero con texto
-// razonable — si ninguno cuadra, el cliente cae a un enlace a la fuente,
-// nunca se queda en blanco ni inventa contenido.
-const CONTENT_SELECTORS = ["article", ".entry-content", ".post-content", "[class*='evangelio' i]", "#content", "main"];
+// El comentario lo firma un autor con el formato "Nombre (Ciudad, País)" justo
+// donde termina el evangelio — se usa esa firma como frontera entre ambos.
+const BYLINE_RE = /([A-ZÀ-Ÿ][\wÀ-ÿ'.-]*(?:\s+[A-Za-zÀ-ÿ'.-]+){1,8})\s\(([^0-9()]{3,60},\s*[^0-9()]{2,40})\)/;
 
-// Marcador donde estas páginas suelen separar el texto del evangelio de su
-// comentario/reflexión. Si no aparece, todo el bloque se trata como una sola
-// pieza de texto (gospelText) sin comentario aparte.
-const COMMENTARY_MARKER_RE = /\bComentario\b\s*:?/i;
+function gospelTitle(citation: string | null): string {
+  const book = citation?.trim().split(/\s+/)[0]?.replace(/\.$/, "");
+  const name = book ? BOOK_NAMES[book] : undefined;
+  return name ? `Evangelio según ${name}` : "Evangelio de hoy";
+}
 
 /**
- * Mejor esfuerzo: extrae el evangelio completo (y su comentario, si la
- * fuente lo separa) para mostrarlo dentro de la app en vez de un enlace de
- * salida. Si algo falla o el resultado no parece texto real, null — el
- * cliente cae a un enlace directo a la fuente.
+ * Mejor esfuerzo: extrae el evangelio completo y, si la fuente lo separa, su
+ * comentario, apoyándose en el rótulo fijo "Texto del Evangelio (cita):" y en
+ * la firma del comentarista que marca dónde empieza su reflexión. Si algo
+ * falla o el marcador no aparece, null — el cliente cae a un enlace directo
+ * a la fuente, nunca se queda en blanco ni inventa contenido.
  */
 export async function GET() {
   try {
@@ -63,32 +82,32 @@ export async function GET() {
     const html = await res.text();
     const $ = cheerio.load(html);
     $("script, style, nav, header, footer, aside, form, noscript, iframe").remove();
+    const bodyText = decodeEntities($("body").text());
 
-    const title = decodeEntities($("meta[property='og:title']").attr("content") ?? $("title").first().text() ?? "") || "Evangelio de hoy";
+    const gospelMarker = bodyText.match(GOSPEL_MARKER_RE);
+    if (!gospelMarker || gospelMarker.index === undefined) return NextResponse.json(null);
 
-    let block = "";
-    for (const selector of CONTENT_SELECTORS) {
-      const text = decodeEntities($(selector).first().text());
-      if (text.length > 200) {
-        block = text;
-        break;
-      }
+    const citation = gospelMarker[1].trim();
+    const rest = bodyText.slice(gospelMarker.index + gospelMarker[0].length);
+
+    const byline = rest.match(BYLINE_RE);
+    let gospelText: string;
+    let commentary: string | null;
+    let commentaryAuthor: string | null;
+
+    if (byline && byline.index !== undefined) {
+      gospelText = truncate(cutAtBoilerplate(rest.slice(0, byline.index)));
+      commentaryAuthor = `${byline[1].trim()} (${byline[2].trim()})`;
+      commentary = truncate(cutAtBoilerplate(rest.slice(byline.index + byline[0].length))) || null;
+    } else {
+      gospelText = truncate(cutAtBoilerplate(rest));
+      commentary = null;
+      commentaryAuthor = null;
     }
 
-    if (!block) {
-      const snippet = decodeEntities($("meta[property='og:description']").attr("content") ?? "");
-      if (!snippet) return NextResponse.json(null);
-      return NextResponse.json({ title, citation: null, gospelText: snippet, commentary: null, sourceUrl: SOURCE_URL } satisfies DailyGospel);
-    }
+    if (!gospelText) return NextResponse.json(null);
 
-    const citationMatch = block.match(CITATION_RE);
-    const citation = citationMatch ? citationMatch[1].trim() : null;
-
-    const markerMatch = block.match(COMMENTARY_MARKER_RE);
-    const gospelText = truncate((markerMatch ? block.slice(0, markerMatch.index) : block).trim());
-    const commentary = markerMatch ? truncate(block.slice((markerMatch.index ?? 0) + markerMatch[0].length).trim()) || null : null;
-
-    const gospel: DailyGospel = { title, citation, gospelText: gospelText || null, commentary, sourceUrl: SOURCE_URL };
+    const gospel: DailyGospel = { title: gospelTitle(citation), citation, gospelText, commentary, commentaryAuthor, sourceUrl: SOURCE_URL };
     return NextResponse.json(gospel);
   } catch {
     return NextResponse.json(null);

@@ -1,10 +1,12 @@
 "use client";
 
-import { Cpu, PlusCircle, Search, Star } from "lucide-react";
+import { AlertTriangle, Cpu, PlusCircle, Search, Star } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Dialog } from "@/design-system/components/Dialog";
 import { EmptyState } from "@/design-system/components/EmptyState";
 import { useExercises, useRecommendedExercises, useToggleFavorite } from "@/features/exercises/hooks";
+import { conflictingInjuries } from "@/features/exercises/recommend";
+import { useInjuries } from "@/features/profile/hooks";
 import type { Exercise } from "@/types/models";
 import { ExerciseFormDialog } from "./ExerciseFormDialog";
 
@@ -25,9 +27,12 @@ export function ExercisePickerDialog({
 }) {
   const { data: exercises = [] } = useExercises();
   const { data: recommended = [] } = useRecommendedExercises(6);
+  const { data: injuries = [] } = useInjuries();
   const toggleFavorite = useToggleFavorite();
   const [query, setQuery] = useState("");
   const [createOpen, setCreateOpen] = useState(false);
+
+  const activeInjuries = useMemo(() => injuries.filter((i) => i.active), [injuries]);
 
   const filtered = useMemo(() => {
     const norm = query.trim().toLowerCase();
@@ -36,6 +41,11 @@ export function ExercisePickerDialog({
   }, [exercises, query]);
 
   const select = (exercise: Exercise) => {
+    const conflicts = activeInjuries.length > 0 ? conflictingInjuries(exercise, activeInjuries) : [];
+    if (conflicts.length > 0) {
+      const areas = conflicts.map((i) => i.note || i.area).join(", ");
+      if (!confirm(`Este ejercicio puede afectar tu lesión activa (${areas}). ¿Seguro que quieres añadirlo?`)) return;
+    }
     onSelect(exercise);
     onOpenChange(false);
   };
@@ -78,17 +88,23 @@ export function ExercisePickerDialog({
           <EmptyState title="Sin resultados" description="Prueba otra búsqueda o crea un ejercicio nuevo." />
         ) : (
           <div>
-            {filtered.map((item) => (
-              <div key={item.id} className="flex items-center py-3.5 border-b border-line-subtle">
-                <button onClick={() => select(item)} className="flex-1 text-left min-w-0">
-                  <p className="text-ink text-base font-semibold truncate">{item.name}</p>
-                  <p className="text-ink-faint text-xs mt-0.5 truncate">{item.muscleGroups.map((m) => MUSCLE_LABEL[m] ?? m).join(" · ")}</p>
-                </button>
-                <button onClick={() => toggleFavorite.mutate(item.id)} className="w-11 h-11 flex items-center justify-center -mr-2 shrink-0">
-                  <Star size={18} className={item.isFavorite ? "text-record fill-record" : "text-line"} />
-                </button>
-              </div>
-            ))}
+            {filtered.map((item) => {
+              const hasConflict = activeInjuries.length > 0 && conflictingInjuries(item, activeInjuries).length > 0;
+              return (
+                <div key={item.id} className="flex items-center py-3.5 border-b border-line-subtle">
+                  <button onClick={() => select(item)} className="flex-1 text-left min-w-0 flex items-center gap-2">
+                    {hasConflict ? <AlertTriangle size={14} className="text-warn shrink-0" /> : null}
+                    <span className="min-w-0">
+                      <p className="text-ink text-base font-semibold truncate">{item.name}</p>
+                      <p className="text-ink-faint text-xs mt-0.5 truncate">{item.muscleGroups.map((m) => MUSCLE_LABEL[m] ?? m).join(" · ")}</p>
+                    </span>
+                  </button>
+                  <button onClick={() => toggleFavorite.mutate(item.id)} className="w-11 h-11 flex items-center justify-center -mr-2 shrink-0">
+                    <Star size={18} className={item.isFavorite ? "text-record fill-record" : "text-line"} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
 

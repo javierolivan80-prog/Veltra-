@@ -26,7 +26,7 @@ function isDueOn(days: number[], key: string): boolean {
  * último cambio de horario del compromiso (manual o automático) — así un
  * ajuste no se encadena con fallos de antes del cambio anterior.
  */
-function trailingMissStreak(commitment: Commitment, doneDays: Set<string>, referenceDate: string): number {
+export function trailingMissStreak(commitment: Commitment, doneDays: Set<string>, referenceDate: string): number {
   const sinceKey = commitment.updatedAt.slice(0, 10);
   const yesterday = shiftDayKey(referenceDate, -1);
   // 21 días cubre de sobra hasta un compromiso de 1 día/semana con 3 fallos seguidos.

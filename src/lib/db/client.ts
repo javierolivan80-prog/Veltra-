@@ -62,8 +62,8 @@ export function getDb(): Promise<IDBPDatabase<VeltraDB>> {
           db.createObjectStore("screenTimeLogs", { keyPath: "id" }).createIndex("date", "date");
           db.createObjectStore("expenses", { keyPath: "id" }).createIndex("date", "date");
           db.createObjectStore("financeGoals", { keyPath: "id" });
-          db.createObjectStore("goals", { keyPath: "id" });
-          db.createObjectStore("goalCheckpoints", { keyPath: "id" }).createIndex("goalId", "goalId");
+          // "goals"/"goalCheckpoints" se creaban aquí; Metas se archivó en la
+          // Fase 1 y la v10 los borra, así que ya no se crean de cero.
         }
         if (oldVersion < 6) {
           db.createObjectStore("dailyMoods", { keyPath: "id" }).createIndex("date", "date");
@@ -82,6 +82,18 @@ export function getDb(): Promise<IDBPDatabase<VeltraDB>> {
         }
         if (oldVersion < 9) {
           db.createObjectStore("faithCheckins", { keyPath: "id" }).createIndex("date", "date");
+        }
+        if (oldVersion < 10) {
+          // Metas se archivó en la Fase 1 (el colapso a Hoy/Progreso/Perfil) y
+          // su UI se borró entonces; estos stores llevan desde entonces sin
+          // nadie que los lea ni los escriba. Mismo caso que pushSubscriptions
+          // en la v7.
+          for (const dead of ["goals", "goalCheckpoints"] as const) {
+            if (db.objectStoreNames.contains(dead as never)) db.deleteObjectStore(dead as never);
+          }
+        }
+        if (oldVersion < 11) {
+          db.createObjectStore("monthlyReviews", { keyPath: "id" }).createIndex("contractId", "contractId");
         }
       },
     }).then(async (db) => {

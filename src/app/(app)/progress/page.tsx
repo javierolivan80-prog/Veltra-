@@ -19,6 +19,7 @@ import { useFocusSessions } from "@/features/focus/hooks";
 import { useJournalEntries } from "@/features/journaling/hooks";
 import { useMeditationSessions } from "@/features/meditation/hooks";
 import { useBodyWeightLogs, useProfile } from "@/features/profile/hooks";
+import { useRoutines } from "@/features/routines/hooks";
 import { sleptMinutes } from "@/features/sleep/calc";
 import { useSleepLogs } from "@/features/sleep/hooks";
 import { useAllSets, useCurrentStreak, useRecentSessions, useSetsForExercise } from "@/features/workouts/hooks";
@@ -27,13 +28,31 @@ import { dayOfArc, daysLeft } from "@/features/contract/arc";
 import { FOCUS_OPTIONS } from "@/features/contract/catalogue";
 import { useActiveContract, useCommitments, useContracts } from "@/features/contract/hooks";
 import type { DoneDaysByKind } from "@/features/review/aggregate";
-import { currentReviewWeekStart } from "@/features/review/aggregate";
-import { useAcceptProposal, useEnsureLocalWeeklyReview, useKeepProposal, useReviews } from "@/features/review/hooks";
+import { currentReviewMonthStart, currentReviewWeekStart } from "@/features/review/aggregate";
+import {
+  useAcceptProposal,
+  useEnsureLocalMonthlyReview,
+  useEnsureLocalWeeklyReview,
+  useKeepProposal,
+  useMonthlyReviews,
+  useReviews,
+} from "@/features/review/hooks";
 import { cn } from "@/lib/cn";
 import { formatHoursMinutes } from "@/lib/duration";
 import { formatDateLong, formatWeight } from "@/lib/format";
-import { shiftDayKey } from "@/lib/date";
-import type { Exercise, SetEntry, WeeklyReview } from "@/types/models";
+import { monthLabel, shiftDayKey } from "@/lib/date";
+import type { Exercise, MonthlyReview, MuscleGroup, SetEntry, WeeklyReview } from "@/types/models";
+
+const MUSCLE_LABEL: Record<string, string> = {
+  chest: "Pecho", back: "Espalda", shoulders: "Hombros", biceps: "Bíceps", triceps: "Tríceps", forearms: "Antebrazos",
+  quads: "Cuádriceps", hamstrings: "Isquios", glutes: "Glúteos", calves: "Gemelos", abs: "Abdomen", traps: "Trapecios",
+  cardio: "Cardio", full_body: "Cuerpo completo",
+};
+
+const MUSCLE_ORDER: MuscleGroup[] = [
+  "chest", "back", "shoulders", "biceps", "triceps", "forearms",
+  "quads", "hamstrings", "glutes", "calves", "abs", "traps", "cardio", "full_body",
+];
 
 const METRIC_COLOR: Record<ProgressMetric, string> = {
   weight: "#2ce6a0",
@@ -108,8 +127,26 @@ function WeeklyReviewCard({ review, onAccept, onKeep, pending }: { review: Weekl
   );
 }
 
+/** Vistazo más largo que la semanal, y sin acciones que tomar: solo el
+ *  resumen del mes que acaba de cerrarse, con su punto fuerte y lo que más
+ *  costó cuando los datos los sostienen. */
+function MonthlyReviewCard({ review }: { review: MonthlyReview }) {
+  return (
+    <div className="rounded-2xl border border-ai/30 bg-ai-bg px-4 py-4">
+      <div className="flex items-center gap-2">
+        <Sparkles size={15} className="text-ai shrink-0" />
+        <p className="text-ai text-[11px] font-bold uppercase tracking-[.14em]">Revisión mensual · {monthLabel(review.monthStart)}</p>
+      </div>
+      <p className="text-ink text-sm mt-2.5 leading-5">{review.summary}</p>
+      {review.highlight ? <p className="text-progress text-sm mt-2 leading-5">{review.highlight}</p> : null}
+      {review.lowlight ? <p className="text-ink-dim text-sm mt-2 leading-5">{review.lowlight}</p> : null}
+    </div>
+  );
+}
+
 export default function ProgressPage() {
-  const { data: exercises = [] } = useExercises();
+  const { data: allExercises = [] } = useExercises();
+  const { data: routines = [] } = useRoutines();
   const recentPRsQuery = useRecentPRs(1);
   const { data: profile } = useProfile();
   const { data: contract } = useActiveContract();
@@ -119,6 +156,14 @@ export default function ProgressPage() {
   const { data: allSleepLogs = [] } = useSleepLogs();
   const { data: weightLogs = [] } = useBodyWeightLogs();
   const { data: streak = 0 } = useCurrentStreak();
+
+  // Solo los ejercicios que el usuario ya tiene en alguna rutina — no el
+  // catálogo entero de ejercicios que existe en la app.
+  const exercises = useMemo(() => {
+    const ids = new Set<string>();
+    for (const routine of routines) for (const re of routine.exercises) ids.add(re.exerciseId);
+    return allExercises.filter((e) => ids.has(e.id));
+  }, [allExercises, routines]);
 
   const { data: commitments = [] } = useCommitments(contract?.id ?? null);
   const { data: recentWorkoutSessions = [] } = useRecentSessions(60);
@@ -149,6 +194,12 @@ export default function ProgressPage() {
   const acceptProposal = useAcceptProposal();
   const keepProposal = useKeepProposal();
   const [reviewHistoryOpen, setReviewHistoryOpen] = useState(false);
+
+  useEnsureLocalMonthlyReview(contract, commitments, doneDaysByKind);
+  const { data: monthlyReviews = [] } = useMonthlyReviews(contract?.id ?? null);
+  const currentMonthlyReview = monthlyReviews.find((r) => r.monthStart === currentReviewMonthStart()) ?? null;
+  const pastMonthlyReviews = monthlyReviews.filter((r) => r !== currentMonthlyReview);
+  const [monthlyReviewHistoryOpen, setMonthlyReviewHistoryOpen] = useState(false);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [metric, setMetric] = useState<ProgressMetric>("weight");
@@ -225,8 +276,23 @@ export default function ProgressPage() {
       const weeklyPaceKg = exAnalysis.pacePerMonth !== null ? Math.round((exAnalysis.pacePerMonth / 4.345) * 10) / 10 : null;
       rows.push({ exercise: ex, weightNow, rankLabel, weeklyPaceKg, status: exAnalysis.status, d30: exAnalysis.windows.d30.delta, setCount: exSets.length });
     }
-    return rows.sort((a, b) => b.setCount - a.setCount).slice(0, 6);
+    return rows.sort((a, b) => b.setCount - a.setCount);
   }, [allSets, exercises, profile]);
+
+  // Agrupados por área muscular (el primer grupo de cada ejercicio) — más
+  // fácil de escanear que una lista plana cuando hay ejercicios de varias
+  // zonas mezclados.
+  const groupedExerciseRows = useMemo(() => {
+    const byGroup = new Map<MuscleGroup, ExerciseRow[]>();
+    for (const row of exerciseRows) {
+      const group = row.exercise.muscleGroups[0];
+      if (!group) continue;
+      const arr = byGroup.get(group);
+      if (arr) arr.push(row);
+      else byGroup.set(group, [row]);
+    }
+    return MUSCLE_ORDER.filter((g) => byGroup.has(g)).map((g) => ({ group: g, rows: byGroup.get(g)! }));
+  }, [exerciseRows]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -285,6 +351,29 @@ export default function ProgressPage() {
         </div>
       ) : null}
 
+      {currentMonthlyReview ? <MonthlyReviewCard review={currentMonthlyReview} /> : null}
+
+      {pastMonthlyReviews.length > 0 ? (
+        <div>
+          <button onClick={() => setMonthlyReviewHistoryOpen((v) => !v)} className="flex items-center justify-between w-full">
+            <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em]">Meses anteriores · {pastMonthlyReviews.length}</p>
+            <ChevronDown size={16} className={cn("text-ink-faint transition-transform", monthlyReviewHistoryOpen && "rotate-180")} />
+          </button>
+          {monthlyReviewHistoryOpen ? (
+            <div className="flex flex-col gap-2 mt-2.5">
+              {pastMonthlyReviews.map((r) => (
+                <Card key={r.id} raised>
+                  <p className="text-ink-faint text-[11px] font-semibold uppercase tracking-wide">{monthLabel(r.monthStart)}</p>
+                  <p className="text-ink text-sm mt-1.5 leading-5">{r.summary}</p>
+                  {r.highlight ? <p className="text-progress text-xs mt-2 leading-5">{r.highlight}</p> : null}
+                  {r.lowlight ? <p className="text-ink-dim text-xs mt-2 leading-5">{r.lowlight}</p> : null}
+                </Card>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
       {contracts.filter((c) => c.status !== "active").length > 0 ? (
         <div>
           <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em] mb-2.5">Arcos anteriores</p>
@@ -318,7 +407,7 @@ export default function ProgressPage() {
 
       {exercises.length === 0 ? (
         <Card raised>
-          <EmptyState title="Aún no hay ejercicios" description="Registra algún entrenamiento y aquí podrás analizar la evolución de cada ejercicio." />
+          <EmptyState title="Sin ejercicios en tus rutinas" description="Añade ejercicios a una rutina y aquí podrás analizar su progreso." />
         </Card>
       ) : null}
 
@@ -357,44 +446,48 @@ export default function ProgressPage() {
         </div>
       </div>
 
-      {exerciseRows.length > 0 ? (
-        <div>
-          <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em] mb-2.5">Ejercicios · rango y estado</p>
-          <div className="flex flex-col gap-2">
-            {exerciseRows.map((row) => {
-              const statusMeta = EXERCISE_STATUS_LABEL[row.status];
-              return (
-                <button
-                  key={row.exercise.id}
-                  onClick={() => {
-                    setSelectedId(row.exercise.id);
-                    setMetric("weight");
-                  }}
-                  className={cn(
-                    "flex items-center gap-3 w-full text-left bg-bg-soft border rounded-lg px-3.5 py-3 transition-colors",
-                    selectedId === row.exercise.id ? "border-progress/40" : "border-line-subtle hover:border-line"
-                  )}
-                >
-                  <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", statusMeta.colorClass.replace("text-", "bg-"))} />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-ink text-[14.5px] font-semibold truncate">{row.exercise.name}</p>
-                    <p className="text-ink-faint text-[11.5px] mt-0.5 truncate">
-                      {row.rankLabel ? `${row.rankLabel} · ` : ""}
-                      {row.status === "progressing" && row.weeklyPaceKg !== null
-                        ? `+${row.weeklyPaceKg} kg/sem`
-                        : row.status === "plateau" || row.status === "stable"
-                          ? `${row.d30 >= 0 ? "+" : ""}${row.d30} kg en 30 días`
-                          : `${row.weeklyPaceKg ?? 0} kg/sem`}
-                      {" · "}
-                      {formatWeight(row.weightNow)} kg
-                    </p>
-                  </div>
-                  <span className={cn("text-xs font-semibold shrink-0", statusMeta.colorClass)}>{statusMeta.label}</span>
-                  <ChevronRight size={16} className="text-ink-faint shrink-0" />
-                </button>
-              );
-            })}
-          </div>
+      {groupedExerciseRows.length > 0 ? (
+        <div className="flex flex-col gap-5">
+          {groupedExerciseRows.map(({ group, rows }) => (
+            <div key={group}>
+              <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em] mb-2.5">{MUSCLE_LABEL[group] ?? group}</p>
+              <div className="flex flex-col gap-2">
+                {rows.map((row) => {
+                  const statusMeta = EXERCISE_STATUS_LABEL[row.status];
+                  return (
+                    <button
+                      key={row.exercise.id}
+                      onClick={() => {
+                        setSelectedId(row.exercise.id);
+                        setMetric("weight");
+                      }}
+                      className={cn(
+                        "flex items-center gap-3 w-full text-left bg-bg-soft border rounded-lg px-3.5 py-3 transition-colors",
+                        selectedId === row.exercise.id ? "border-progress/40" : "border-line-subtle hover:border-line"
+                      )}
+                    >
+                      <span className={cn("w-1.5 h-1.5 rounded-full shrink-0", statusMeta.colorClass.replace("text-", "bg-"))} />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-ink text-[14.5px] font-semibold truncate">{row.exercise.name}</p>
+                        <p className="text-ink-faint text-[11.5px] mt-0.5 truncate">
+                          {row.rankLabel ? `${row.rankLabel} · ` : ""}
+                          {row.status === "progressing" && row.weeklyPaceKg !== null
+                            ? `+${row.weeklyPaceKg} kg/sem`
+                            : row.status === "plateau" || row.status === "stable"
+                              ? `${row.d30 >= 0 ? "+" : ""}${row.d30} kg en 30 días`
+                              : `${row.weeklyPaceKg ?? 0} kg/sem`}
+                          {" · "}
+                          {formatWeight(row.weightNow)} kg
+                        </p>
+                      </div>
+                      <span className={cn("text-xs font-semibold shrink-0", statusMeta.colorClass)}>{statusMeta.label}</span>
+                      <ChevronRight size={16} className="text-ink-faint shrink-0" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </div>
       ) : null}
 

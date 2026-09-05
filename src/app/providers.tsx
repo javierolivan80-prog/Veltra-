@@ -3,6 +3,7 @@
 import { createSyncStoragePersister } from "@tanstack/query-sync-storage-persister";
 import { PersistQueryClientProvider } from "@tanstack/react-query-persist-client";
 import { useEffect, useState } from "react";
+import { ToastHost } from "@/design-system/components/ToastHost";
 import { useRegisterServiceWorker } from "@/features/pwa/registerServiceWorker";
 import { createQueryClient, OFFLINE_CACHE_MAX_AGE_MS } from "@/lib/queryClient";
 import { useAuthStore } from "@/state/auth.store";
@@ -30,6 +31,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <PersistQueryClientProvider client={queryClient} persistOptions={{ persister, maxAge: OFFLINE_CACHE_MAX_AGE_MS }}>
       {children}
+      <ToastHost />
     </PersistQueryClientProvider>
   );
 }

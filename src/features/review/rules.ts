@@ -1,6 +1,6 @@
 import { frequencyLabel } from "@/features/contract/catalogue";
 import type { ReviewProposal } from "@/types/models";
-import type { CommitmentStat, ReviewAggregate } from "./aggregate";
+import type { CommitmentStat, MonthlyCommitmentStat, MonthlyReviewAggregate, ReviewAggregate } from "./aggregate";
 
 export interface RuleReviewResult {
   summary: string;
@@ -79,4 +79,72 @@ export function generateRuleBasedReview(aggregate: ReviewAggregate): RuleReviewR
   }
 
   return { summary, pattern, proposal };
+}
+
+// ---------------------------------------------------------------------
+// Revisión mensual — mismo espíritu, ventana natural de un mes, y sin
+// proposal: cambiar la frecuencia de un compromiso ya es el trabajo de la
+// revisión semanal. Aquí solo un vistazo más largo: el punto fuerte y lo
+// que más costó, cada uno con datos suficientes para no ser ruido.
+// ---------------------------------------------------------------------
+
+export interface MonthlyRuleReviewResult {
+  summary: string;
+  highlight: string | null;
+  lowlight: string | null;
+}
+
+/** Al menos 2 veces por semana de media en el mes — por debajo de eso, un
+ *  mes entero no basta para distinguir una racha real de suerte. */
+const MIN_DUE_FOR_SIGNAL = 8;
+
+export function generateRuleBasedMonthlyReview(aggregate: MonthlyReviewAggregate): MonthlyRuleReviewResult {
+  const measurable = aggregate.commitments.filter((c) => c.measurable);
+  const withData = measurable.filter((c) => c.dueMonth > 0);
+
+  if (withData.length === 0) {
+    return {
+      summary: "Este mes no había compromisos con días marcados que revisar.",
+      highlight: null,
+      lowlight: null,
+    };
+  }
+
+  const totalDue = withData.reduce((s, c) => s + c.dueMonth, 0);
+  const totalDone = withData.reduce((s, c) => s + c.doneMonth, 0);
+  const perCommitment = withData.map((c) => `${c.title} ${c.doneMonth}/${c.dueMonth}`).join(", ");
+  const summary = `Este mes completaste ${totalDone} de ${totalDue} compromisos (${Math.round((totalDone / totalDue) * 100)}%). Por compromiso: ${perCommitment}.`;
+
+  const withSignal = withData.filter((c) => c.dueMonth >= MIN_DUE_FOR_SIGNAL);
+
+  let highlight: string | null = null;
+  let best: MonthlyCommitmentStat | null = null;
+  let bestRate = 0;
+  for (const c of withSignal) {
+    const rate = c.doneMonth / c.dueMonth;
+    if (rate > bestRate) {
+      bestRate = rate;
+      best = c;
+    }
+  }
+  if (best && bestRate >= 0.7) {
+    highlight = `Tu punto fuerte del mes: "${best.title}", cumplido ${Math.round(bestRate * 100)}%.`;
+  }
+
+  let lowlight: string | null = null;
+  let worst: MonthlyCommitmentStat | null = null;
+  let worstRate = 1;
+  for (const c of withSignal) {
+    if (c === best) continue;
+    const rate = c.doneMonth / c.dueMonth;
+    if (rate < worstRate) {
+      worstRate = rate;
+      worst = c;
+    }
+  }
+  if (worst && worstRate < 0.5) {
+    lowlight = `Lo que más te costó: "${worst.title}", cumplido solo ${Math.round(worstRate * 100)}%.`;
+  }
+
+  return { summary, highlight, lowlight };
 }

@@ -119,3 +119,10 @@ export function useDeleteExerciseFromSession() {
     },
   });
 }
+
+export function useWorkoutSuggestions(limit = 5) {
+  return useQuery({
+    queryKey: [...workoutKeys.all, "suggestions", limit] as const,
+    queryFn: () => repo.getWorkoutSuggestions(limit),
+  });
+}

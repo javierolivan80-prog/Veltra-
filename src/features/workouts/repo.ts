@@ -1,7 +1,9 @@
 import { getDb } from "@/lib/db/client";
 import { getExercise } from "@/features/exercises/repo";
 import { checkAndRecordPRs } from "@/features/exercises/prs";
-import { getProfile } from "@/features/profile/repo";
+import { getProfile, listInjuries } from "@/features/profile/repo";
+import { listExercises } from "@/features/exercises/repo";
+import { suggestWorkoutStructure, type SuggestionContext } from "./suggestions";
 import { generateId } from "@/lib/id";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { toCamelCase, toSnakeCase } from "@/lib/supabase/case";
@@ -266,4 +268,30 @@ export async function currentStreakDays(): Promise<number> {
     }
   }
   return streak;
+}
+
+export async function getWorkoutSuggestions(limit = 5) {
+  const [profile, injuries, exercises, recentSessions] = await Promise.all([
+    getProfile(),
+    listInjuries(),
+    listExercises(),
+    listRecentSessions(15), // Look at last 15 sessions (roughly 3-4 weeks)
+  ]);
+
+  // Map sets by session
+  const setsBySession = new Map<string, SetEntry[]>();
+  for (const session of recentSessions) {
+    const sets = await getSessionSets(session.id);
+    setsBySession.set(session.id, sets);
+  }
+
+  const context: SuggestionContext = {
+    profile,
+    injuries: injuries.filter((i) => i.active),
+    exercises,
+    recentSessions,
+    setsBySession,
+  };
+
+  return suggestWorkoutStructure(context).slice(0, limit);
 }

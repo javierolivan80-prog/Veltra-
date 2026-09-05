@@ -47,6 +47,10 @@ export async function getProfile(): Promise<Profile | null> {
 
 export async function upsertProfile(input: ProfileInput): Promise<Profile> {
   const now = new Date().toISOString();
+  // Capturada en cada guardado (no solo en el alta) para que un viaje o un
+  // cambio de dispositivo la mantenga al día — mismo dato que habits.timezone
+  // ya captura igual en HabitFormDialog.
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   if (isSupabaseConfigured) {
     const supabase = getSupabaseBrowserClient()!;
@@ -65,6 +69,7 @@ export async function upsertProfile(input: ProfileInput): Promise<Profile> {
       trainingDaysPerWeek: input.trainingDaysPerWeek,
       equipmentAvailable: input.equipmentAvailable,
       onboardingCompleted: true,
+      timezone,
       updatedAt: now,
     });
     // Normally the profile row already exists (created by the handle_new_user
@@ -96,6 +101,7 @@ export async function upsertProfile(input: ProfileInput): Promise<Profile> {
     targetWeightKg: existing?.targetWeightKg ?? null,
     recoveryEnabled: existing?.recoveryEnabled ?? false,
     faithEnabled: existing?.faithEnabled ?? false,
+    timezone,
     createdAt: existing?.createdAt ?? now,
     updatedAt: now,
   };

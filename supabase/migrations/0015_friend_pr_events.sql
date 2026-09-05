@@ -22,7 +22,7 @@ create table if not exists friend_pr_events (
 alter table friend_pr_events enable row level security;
 create policy "select own pr events" on friend_pr_events for select using (user_id = auth.uid());
 create policy "select friends pr events" on friend_pr_events for select using (
-  exists (select 1 from friendships f where f.viewer_id = auth.uid() and f.target_id = friend_pr_events.user_id)
+  exists (select 1 from friend_follows f where f.viewer_id = auth.uid() and f.target_id = friend_pr_events.user_id)
 );
 create policy "insert own pr events" on friend_pr_events for insert with check (user_id = auth.uid());
 

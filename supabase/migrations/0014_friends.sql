@@ -45,18 +45,22 @@ $$;
 revoke all on function resolve_friend_code(text) from public;
 grant execute on function resolve_friend_code(text) to authenticated;
 
-create table if not exists friendships (
+-- "friend_follows", no "friendships": ese nombre ya está ocupado por una
+-- tabla previa sin relación (requester_id/addressee_id/status, un sistema
+-- de solicitudes de amistad que nunca se llegó a usar). Reutilizarlo aquí
+-- habría hecho fallar la migración entera al chocar con sus columnas.
+create table if not exists friend_follows (
   viewer_id uuid not null references auth.users(id) on delete cascade,
   target_id uuid not null references auth.users(id) on delete cascade,
   created_at timestamptz not null default now(),
   primary key (viewer_id, target_id),
-  constraint friendships_no_self check (viewer_id <> target_id)
+  constraint friend_follows_no_self check (viewer_id <> target_id)
 );
 
-alter table friendships enable row level security;
-create policy "select own friendships" on friendships for select using (viewer_id = auth.uid());
-create policy "insert own friendships" on friendships for insert with check (viewer_id = auth.uid());
-create policy "delete own friendships" on friendships for delete using (viewer_id = auth.uid());
+alter table friend_follows enable row level security;
+create policy "select own follows" on friend_follows for select using (viewer_id = auth.uid());
+create policy "insert own follows" on friend_follows for insert with check (viewer_id = auth.uid());
+create policy "delete own follows" on friend_follows for delete using (viewer_id = auth.uid());
 
 create table if not exists friend_progress (
   user_id uuid primary key references auth.users(id) on delete cascade,
@@ -72,9 +76,9 @@ alter table friend_progress enable row level security;
 -- y la de cualquiera que te haya dado su código.
 create policy "select own progress" on friend_progress for select using (user_id = auth.uid());
 create policy "select friends progress" on friend_progress for select using (
-  exists (select 1 from friendships f where f.viewer_id = auth.uid() and f.target_id = friend_progress.user_id)
+  exists (select 1 from friend_follows f where f.viewer_id = auth.uid() and f.target_id = friend_progress.user_id)
 );
 create policy "insert own progress" on friend_progress for insert with check (user_id = auth.uid());
 create policy "update own progress" on friend_progress for update using (user_id = auth.uid()) with check (user_id = auth.uid());
 
-create index if not exists idx_friendships_viewer on friendships(viewer_id);
+create index if not exists idx_friend_follows_viewer on friend_follows(viewer_id);

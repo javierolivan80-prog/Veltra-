@@ -47,7 +47,7 @@ export interface PrEventInput {
 }
 
 async function friendTargetIds(supabase: ReturnType<typeof getSupabaseBrowserClient>, viewerId: string): Promise<string[]> {
-  const { data: links } = await supabase!.from("friendships").select("target_id").eq("viewer_id", viewerId);
+  const { data: links } = await supabase!.from("friend_follows").select("target_id").eq("viewer_id", viewerId);
   return (links ?? []).map((l: { target_id: string }) => l.target_id);
 }
 
@@ -85,7 +85,7 @@ export async function redeemInviteCode(code: string): Promise<void> {
   if (!targetId) throw new Error("Ese código no existe. Revísalo e inténtalo de nuevo.");
   if (targetId === viewerId) throw new Error("Ese es tu propio código.");
 
-  const { error: insertError } = await supabase.from("friendships").insert({ viewer_id: viewerId, target_id: targetId });
+  const { error: insertError } = await supabase.from("friend_follows").insert({ viewer_id: viewerId, target_id: targetId });
   if (insertError) {
     if (insertError.code === "23505") throw new Error("Ya has añadido a esta persona.");
     throw insertError;

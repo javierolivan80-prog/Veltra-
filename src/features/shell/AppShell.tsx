@@ -1,6 +1,6 @@
 "use client";
 
-import { Home, TrendingUp, User } from "lucide-react";
+import { Dumbbell, Home, ShieldAlert, TrendingUp, User, UtensilsCrossed } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, type ReactNode } from "react";
@@ -10,18 +10,27 @@ import { useActiveContract } from "@/features/contract/hooks";
 import { useProfile } from "@/features/profile/hooks";
 import { isOnboarded } from "@/features/profile/repo";
 
-/** Tres destinos: el plan de hoy, lo que la app devuelve, y los ajustes.
- *  Los módulos dejan de ser destinos y pasan a ser bloques dentro de Hoy. */
-const NAV_ITEMS = [
+/** Seis destinos: el plan del resto de compromisos del día (sueño,
+ *  meditación, foco, diario, fe), y Entrenamiento/Comida/Adicciones como
+ *  sitios propios en vez de bloques dentro de Hoy — cada uno con su propio
+ *  "hoy" arriba y el resto del módulo debajo. Adicciones solo aparece si
+ *  está activada en Perfil: sigue oculta por defecto, pero ya no depende de
+ *  encontrar el bloque suelto en Hoy para llegar a ella. */
+const BASE_NAV_ITEMS = [
   { href: "/dashboard", label: "Hoy", icon: Home, activeColor: "text-progress" },
+  { href: "/routines", label: "Entrenamiento", icon: Dumbbell, activeColor: "text-progress" },
+  { href: "/food", label: "Comida", icon: UtensilsCrossed, activeColor: "text-progress" },
   { href: "/progress", label: "Progreso", icon: TrendingUp, activeColor: "text-progress" },
   { href: "/profile", label: "Perfil", icon: User, activeColor: "text-progress" },
 ];
 
+const ADDICTIONS_NAV_ITEM = { href: "/addictions", label: "Adicciones", icon: ShieldAlert, activeColor: "text-addiction" };
+
 /** Rutas de módulo que cuelgan de cada destino, para que la pestaña siga
  *  marcada cuando estás dos niveles dentro (p. ej. /sleep marca "Hoy"). */
 const CATEGORY_CHILDREN: Record<string, string[]> = {
-  "/dashboard": ["/routines", "/workout", "/exercises", "/sleep", "/food", "/habits", "/meditation", "/journal", "/focus", "/addictions"],
+  "/dashboard": ["/sleep", "/habits", "/meditation", "/journal", "/focus", "/faith"],
+  "/routines": ["/workout", "/exercises"],
   "/progress": ["/history", "/weight"],
   "/profile": ["/contract"],
 };
@@ -42,6 +51,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // que hay compromisos que lo llenen.
   const { data: contract, isLoading: contractLoading } = useActiveContract();
   const profileReady = !isLoading && isOnboarded(profile);
+  const navItems = profile?.recoveryEnabled ? [...BASE_NAV_ITEMS.slice(0, 3), ADDICTIONS_NAV_ITEM, ...BASE_NAV_ITEMS.slice(3)] : BASE_NAV_ITEMS;
 
   useEffect(() => {
     if (isLoading) return;
@@ -62,7 +72,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <Logo size="sm" />
         </div>
         <nav className="flex flex-col gap-1 flex-1">
-          {NAV_ITEMS.map((item) => {
+          {navItems.map((item) => {
             const active = isActive(pathname, item.href);
             const Icon = item.icon;
             return (
@@ -89,7 +99,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
       {/* Mobile bottom nav */}
       <nav className="md:hidden fixed bottom-4 left-3 right-3 z-50 bg-[#101010]/95 backdrop-blur-[16px] border border-line-subtle rounded-lg shadow-2xl shadow-black/40 px-1.5 py-2.5 flex">
-        {NAV_ITEMS.map((item) => {
+        {navItems.map((item) => {
           const active = isActive(pathname, item.href);
           const Icon = item.icon;
           return (

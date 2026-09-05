@@ -22,22 +22,20 @@ import { contractKeys, useActiveContract, useCommitments } from "@/features/cont
 import { popAdaptiveNotices } from "@/features/contract/notices";
 import { usePushMyProgress } from "@/features/friends/hooks";
 import { useFocusSessions } from "@/features/focus/hooks";
-import { useAllFoodMeals, useDailyNutrition } from "@/features/food/hooks";
+import { useAllFoodMeals } from "@/features/food/hooks";
 import { useJournalEntries, useJournalEntryByDate } from "@/features/journaling/hooks";
 import { useAddictions, useAllRelapses } from "@/features/addictions/hooks";
 import { currentStreakStartMs } from "@/features/addictions/stats";
 import { useMeditationSessions } from "@/features/meditation/hooks";
 import { useProfile } from "@/features/profile/hooks";
-import { useRoutines } from "@/features/routines/hooks";
 import { sleptMinutes } from "@/features/sleep/calc";
 import { useSleepLogByDate, useSleepLogs } from "@/features/sleep/hooks";
-import { RoutinePickerDialog } from "@/features/workouts/RoutinePickerDialog";
-import { useActiveSession, useRecentSessions, useStartSession } from "@/features/workouts/hooks";
+import { useRecentSessions } from "@/features/workouts/hooks";
 import { cn } from "@/lib/cn";
 import { daysBetweenDayKeys, todayKey } from "@/lib/date";
 import { formatHoursMinutes } from "@/lib/duration";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import type { CommitmentKind, Routine } from "@/types/models";
+import type { CommitmentKind } from "@/types/models";
 
 function timeLabelOf(iso: string): { label: string; minutes: number } {
   const d = new Date(iso);
@@ -123,13 +121,10 @@ export default function DashboardPage() {
   const [nowMs] = useState(() => Date.now());
   const { data: contract } = useActiveContract();
   const { data: commitments = [] } = useCommitments(contract?.id ?? null);
-  const { data: routines = [] } = useRoutines();
-  // 30 en vez de 10: además de "rutina sugerida" y "sesión de hoy", esta
-  // lista alimenta la detección de fallos de la Fase 5, que mira hasta 3
-  // semanas atrás.
+  // Entrenamiento tiene su propia pestaña — esta lista solo alimenta ya la
+  // detección de fallos de la Fase 5 (doneDaysByKind), que mira hasta 3
+  // semanas atrás, no un bloque de "empezar entrenamiento" en Hoy.
   const { data: recentSessions = [] } = useRecentSessions(30);
-  const { data: activeSession } = useActiveSession();
-  const startSession = useStartSession();
 
   const { data: lastNight } = useSleepLogByDate(today);
   const { data: allSleepLogs = [] } = useSleepLogs();
@@ -137,7 +132,6 @@ export default function DashboardPage() {
   const { data: todayJournal } = useJournalEntryByDate(today);
   const { data: allJournalEntries = [] } = useJournalEntries();
   const { data: focusSessions = [] } = useFocusSessions();
-  const { data: nutrition } = useDailyNutrition(today);
   const { data: allMeals = [] } = useAllFoodMeals();
   const { data: profile } = useProfile();
   const { data: addictions = [] } = useAddictions();
@@ -180,24 +174,15 @@ export default function DashboardPage() {
   );
   useApplyAutoReductions(commitments, doneDaysByKind);
 
-  const suggestedRoutine = useMemo(() => {
-    if (routines.length === 0) return null;
-    const lastDoneAt = (routineId: string) => {
-      const s = recentSessions.find((s) => s.routineId === routineId);
-      return s ? new Date(s.startedAt).getTime() : 0;
-    };
-    return [...routines].sort((a, b) => lastDoneAt(a.id) - lastDoneAt(b.id))[0];
-  }, [routines, recentSessions]);
-
-  const completedSessionToday = useMemo(
-    () => recentSessions.find((s) => s.status === "completed" && s.startedAt.slice(0, 10) === today) ?? null,
-    [recentSessions, today]
-  );
   const meditatedToday = useMemo(() => meditationSessions.find((s) => s.completedAt.slice(0, 10) === today) ?? null, [meditationSessions, today]);
   const focusedToday = useMemo(() => focusSessions.find((s) => s.completedAt.slice(0, 10) === today) ?? null, [focusSessions, today]);
-  const ateToday = (nutrition?.mealCount ?? 0) > 0;
 
-  const todaysCommitments = useMemo(() => commitmentsForDay(commitments, today), [commitments, today]);
+  // Entrenamiento y Comida ya tienen su propia pestaña con su propio "hoy"
+  // arriba — aquí solo queda el resto: sueño, meditación, foco, diario, fe.
+  const todaysCommitments = useMemo(
+    () => commitmentsForDay(commitments, today).filter((c) => c.kind !== "workout" && c.kind !== "nutrition"),
+    [commitments, today]
+  );
   const motivationalNudges = useMemo(
     () => buildMotivationalNudges(todaysCommitments, doneDaysByKind, today, contract?.why ?? null),
     [todaysCommitments, doneDaysByKind, today, contract?.why]
@@ -247,23 +232,6 @@ export default function DashboardPage() {
   // suelto de abajo sobraría y aparecería dos veces la misma cosa.
   const faithIsCommitment = todaysCommitments.some((c) => c.kind === "faith");
 
-  // "Empezar entrenamiento" ya no arranca directo con la rutina en rotación:
-  // abre el selector para que la decisión sea del usuario, con la sugerida
-  // ya marcada para quien solo quiere confirmarla de un toque.
-  const [routinePickerOpen, setRoutinePickerOpen] = useState(false);
-  const handleStart = () => {
-    if (activeSession) {
-      router.push(`/workout/${activeSession.id}`);
-      return;
-    }
-    setRoutinePickerOpen(true);
-  };
-  const startWithRoutine = async (routine: Routine | null) => {
-    setRoutinePickerOpen(false);
-    const session = await startSession.mutateAsync({ routineId: routine?.id ?? null, routineName: routine?.name ?? null });
-    router.push(`/workout/${session.id}`);
-  };
-
   // El arco tiene fecha de fin: pasado endsOn no queda ningún día del plan
   // que mostrar. Antes de hoy, esto simplemente no pasaba nada — dayOfArc
   // se quedaba clavado en durationDays y la app seguía enseñando un plan de
@@ -291,32 +259,6 @@ export default function DashboardPage() {
       };
 
       switch (c.kind) {
-        case "workout": {
-          if (activeSession) {
-            const { label } = timeLabelOf(activeSession.startedAt);
-            return {
-              ...base,
-              timeLabel: label,
-              kicker: "Ahora",
-              title: activeSession.routineName ?? c.title,
-              meta: "En marcha",
-              state: "now",
-              href: undefined,
-              cta: { label: "Continuar entrenamiento", onClick: () => router.push(`/workout/${activeSession.id}`) },
-            };
-          }
-          if (completedSessionToday) {
-            const { label } = timeLabelOf(completedSessionToday.startedAt);
-            return { ...base, timeLabel: label, meta: completedSessionToday.routineName ?? "Completado", state: "done", href: undefined };
-          }
-          return {
-            ...base,
-            meta: suggestedRoutine ? `${suggestedRoutine.name} · ${suggestedRoutine.exercises.length} ejercicios` : "Elige tu rutina",
-            state: "pending",
-            href: undefined,
-            cta: { label: "Empezar entrenamiento", onClick: handleStart },
-          };
-        }
         case "sleep": {
           const avgLabel = sleepAvg7dMin !== null ? `media 7d: ${formatHoursMinutes(sleepAvg7dMin)}` : null;
           return lastNight
@@ -329,10 +271,6 @@ export default function DashboardPage() {
               }
             : { ...base, meta: avgLabel ? `Sin registrar · ${avgLabel}` : "Sin registrar", state: "pending" };
         }
-        case "nutrition":
-          return ateToday
-            ? { ...base, meta: `${Math.round(nutrition?.calories ?? 0)} kcal registradas`, state: "done", href: undefined }
-            : { ...base, meta: "Sin registrar", state: "pending" };
         case "meditation": {
           const weekLabel = meditation7dMin !== null ? `7d: ${meditation7dMin} min` : null;
           return meditatedToday
@@ -363,16 +301,10 @@ export default function DashboardPage() {
           return { ...base, meta: "Márcalo en Hábitos", state: "pending" };
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     todaysCommitments,
-    activeSession,
-    completedSessionToday,
-    suggestedRoutine,
     lastNight,
     sleepAvg7dMin,
-    ateToday,
-    nutrition,
     meditatedToday,
     meditation7dMin,
     todayJournal,
@@ -380,7 +312,6 @@ export default function DashboardPage() {
     focusedToday,
     focus7dMin,
     faithToday,
-    router,
   ]);
 
   const sorted = useMemo(() => [...items].sort((a, b) => a.order - b.order), [items]);
@@ -601,15 +532,6 @@ export default function DashboardPage() {
       <InstallPrompt eligible={arcDay !== null && arcDay >= 2} />
 
       <PlanCelebration streak={celebratedStreak} onDismiss={() => setCelebratedStreak(null)} />
-
-      <RoutinePickerDialog
-        open={routinePickerOpen}
-        onOpenChange={setRoutinePickerOpen}
-        routines={routines}
-        suggestedRoutineId={suggestedRoutine?.id ?? null}
-        onSelect={(routine) => startWithRoutine(routine)}
-        onSelectFree={() => startWithRoutine(null)}
-      />
     </div>
   );
 }

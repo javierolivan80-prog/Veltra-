@@ -103,7 +103,7 @@ export default function FocusPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <CategoryBackLink href="/mind" label="Mente" />
+      <CategoryBackLink href="/dashboard" label="Hoy" />
       <div>
         <p className="text-ink-dim text-sm">Mente</p>
         <h1 className="text-ink text-2xl font-display mt-0.5">Foco</h1>

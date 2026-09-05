@@ -3,7 +3,6 @@
 import { BookMarked, CalendarDays } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
-import { CategoryBackLink } from "@/design-system/components/CategoryBackLink";
 import { DailyProgressCard } from "@/features/food/components/DailyProgressCard";
 import { FoodChat } from "@/features/food/components/FoodChat";
 import { NutritionGoalsDialog } from "@/features/food/components/NutritionGoalsDialog";
@@ -25,7 +24,6 @@ export default function FoodTodayPage() {
 
   return (
     <div className="flex flex-col h-[calc(100vh-7rem)] md:h-[calc(100vh-3.5rem)]">
-      <CategoryBackLink href="/body" label="Cuerpo" />
       <div className="flex items-center justify-between mb-4 shrink-0">
         <div>
           <h1 className="text-ink text-2xl font-display">Veltra Food</h1>

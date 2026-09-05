@@ -176,7 +176,7 @@ export default function ProfilePage() {
             <div className="min-w-0">
               <p className="text-ink text-sm font-semibold">Llevar la cuenta de algo que quiero dejar</p>
               <p className="text-ink-dim text-xs mt-1 leading-5">
-                Si lo activas, aparece como un bloque en Hoy. Si no, no se te menciona en ningún sitio.
+                Si lo activas, aparece como pestaña propia. Si no, no se te menciona en ningún sitio.
               </p>
             </div>
             <button

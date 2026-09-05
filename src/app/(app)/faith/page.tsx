@@ -43,7 +43,7 @@ export default function FaithPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <CategoryBackLink href="/profile" label="Perfil" />
+      <CategoryBackLink href="/dashboard" label="Hoy" />
       <div className="flex items-center gap-3">
         <span className="w-11 h-11 rounded-full bg-progress/15 flex items-center justify-center shrink-0">
           <Cross size={20} className="text-progress" />

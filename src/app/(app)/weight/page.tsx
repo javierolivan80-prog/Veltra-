@@ -53,7 +53,7 @@ export default function WeightPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <CategoryBackLink href="/body" label="Cuerpo" />
+      <CategoryBackLink href="/progress" label="Progreso" />
       <div>
         <p className="text-ink-dim text-sm">Cuerpo</p>
         <h1 className="text-ink text-2xl font-display mt-0.5">Peso</h1>

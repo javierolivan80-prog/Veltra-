@@ -552,6 +552,26 @@ export interface WeeklyReview {
 }
 
 // ---------------------------------------------------------------------
+// Revisión mensual — el mismo motor mirando un mes natural completo en vez
+// de una ventana de 7 días. Deliberadamente sin propuesta de cambio: ese es
+// el trabajo de la revisión semanal, y duplicarlo aquí sería la misma
+// mecánica dos veces con distinto nombre. En su lugar, un vistazo más largo:
+// tu punto fuerte del mes y lo que más te costó.
+// ---------------------------------------------------------------------
+
+export interface MonthlyReview {
+  id: string;
+  contractId: string;
+  /** Day-key (YYYY-MM-DD) del primer día del mes revisado. */
+  monthStart: string;
+  summary: string;
+  highlight: string | null;
+  lowlight: string | null;
+  generatedBy: ReviewGeneratedBy;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------
 // Fe católica — un check-in por día, opcional (ver Profile.faithEnabled).
 // El examen de conciencia es texto libre y privado: sin categorías fijas
 // de faltas, cada uno lo escribe a su manera.

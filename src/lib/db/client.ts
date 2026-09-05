@@ -92,6 +92,9 @@ export function getDb(): Promise<IDBPDatabase<VeltraDB>> {
             if (db.objectStoreNames.contains(dead as never)) db.deleteObjectStore(dead as never);
           }
         }
+        if (oldVersion < 11) {
+          db.createObjectStore("monthlyReviews", { keyPath: "id" }).createIndex("contractId", "contractId");
+        }
       },
     }).then(async (db) => {
       await seedExerciseLibrary(db);

@@ -28,13 +28,20 @@ import { dayOfArc, daysLeft } from "@/features/contract/arc";
 import { FOCUS_OPTIONS } from "@/features/contract/catalogue";
 import { useActiveContract, useCommitments, useContracts } from "@/features/contract/hooks";
 import type { DoneDaysByKind } from "@/features/review/aggregate";
-import { currentReviewWeekStart } from "@/features/review/aggregate";
-import { useAcceptProposal, useEnsureLocalWeeklyReview, useKeepProposal, useReviews } from "@/features/review/hooks";
+import { currentReviewMonthStart, currentReviewWeekStart } from "@/features/review/aggregate";
+import {
+  useAcceptProposal,
+  useEnsureLocalMonthlyReview,
+  useEnsureLocalWeeklyReview,
+  useKeepProposal,
+  useMonthlyReviews,
+  useReviews,
+} from "@/features/review/hooks";
 import { cn } from "@/lib/cn";
 import { formatHoursMinutes } from "@/lib/duration";
 import { formatDateLong, formatWeight } from "@/lib/format";
-import { shiftDayKey } from "@/lib/date";
-import type { Exercise, MuscleGroup, SetEntry, WeeklyReview } from "@/types/models";
+import { monthLabel, shiftDayKey } from "@/lib/date";
+import type { Exercise, MonthlyReview, MuscleGroup, SetEntry, WeeklyReview } from "@/types/models";
 
 const MUSCLE_LABEL: Record<string, string> = {
   chest: "Pecho", back: "Espalda", shoulders: "Hombros", biceps: "Bíceps", triceps: "Tríceps", forearms: "Antebrazos",
@@ -120,6 +127,23 @@ function WeeklyReviewCard({ review, onAccept, onKeep, pending }: { review: Weekl
   );
 }
 
+/** Vistazo más largo que la semanal, y sin acciones que tomar: solo el
+ *  resumen del mes que acaba de cerrarse, con su punto fuerte y lo que más
+ *  costó cuando los datos los sostienen. */
+function MonthlyReviewCard({ review }: { review: MonthlyReview }) {
+  return (
+    <div className="rounded-2xl border border-ai/30 bg-ai-bg px-4 py-4">
+      <div className="flex items-center gap-2">
+        <Sparkles size={15} className="text-ai shrink-0" />
+        <p className="text-ai text-[11px] font-bold uppercase tracking-[.14em]">Revisión mensual · {monthLabel(review.monthStart)}</p>
+      </div>
+      <p className="text-ink text-sm mt-2.5 leading-5">{review.summary}</p>
+      {review.highlight ? <p className="text-progress text-sm mt-2 leading-5">{review.highlight}</p> : null}
+      {review.lowlight ? <p className="text-ink-dim text-sm mt-2 leading-5">{review.lowlight}</p> : null}
+    </div>
+  );
+}
+
 export default function ProgressPage() {
   const { data: allExercises = [] } = useExercises();
   const { data: routines = [] } = useRoutines();
@@ -170,6 +194,12 @@ export default function ProgressPage() {
   const acceptProposal = useAcceptProposal();
   const keepProposal = useKeepProposal();
   const [reviewHistoryOpen, setReviewHistoryOpen] = useState(false);
+
+  useEnsureLocalMonthlyReview(contract, commitments, doneDaysByKind);
+  const { data: monthlyReviews = [] } = useMonthlyReviews(contract?.id ?? null);
+  const currentMonthlyReview = monthlyReviews.find((r) => r.monthStart === currentReviewMonthStart()) ?? null;
+  const pastMonthlyReviews = monthlyReviews.filter((r) => r !== currentMonthlyReview);
+  const [monthlyReviewHistoryOpen, setMonthlyReviewHistoryOpen] = useState(false);
 
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [metric, setMetric] = useState<ProgressMetric>("weight");
@@ -314,6 +344,29 @@ export default function ProgressPage() {
                   <p className="text-ink text-sm mt-1.5 leading-5">{r.summary}</p>
                   {r.proposalStatus === "accepted" ? <p className="text-progress text-xs mt-2 font-semibold">Propuesta aceptada</p> : null}
                   {r.proposalStatus === "kept" ? <p className="text-ink-faint text-xs mt-2 font-semibold">Plan mantenido</p> : null}
+                </Card>
+              ))}
+            </div>
+          ) : null}
+        </div>
+      ) : null}
+
+      {currentMonthlyReview ? <MonthlyReviewCard review={currentMonthlyReview} /> : null}
+
+      {pastMonthlyReviews.length > 0 ? (
+        <div>
+          <button onClick={() => setMonthlyReviewHistoryOpen((v) => !v)} className="flex items-center justify-between w-full">
+            <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em]">Meses anteriores · {pastMonthlyReviews.length}</p>
+            <ChevronDown size={16} className={cn("text-ink-faint transition-transform", monthlyReviewHistoryOpen && "rotate-180")} />
+          </button>
+          {monthlyReviewHistoryOpen ? (
+            <div className="flex flex-col gap-2 mt-2.5">
+              {pastMonthlyReviews.map((r) => (
+                <Card key={r.id} raised>
+                  <p className="text-ink-faint text-[11px] font-semibold uppercase tracking-wide">{monthLabel(r.monthStart)}</p>
+                  <p className="text-ink text-sm mt-1.5 leading-5">{r.summary}</p>
+                  {r.highlight ? <p className="text-progress text-xs mt-2 leading-5">{r.highlight}</p> : null}
+                  {r.lowlight ? <p className="text-ink-dim text-xs mt-2 leading-5">{r.lowlight}</p> : null}
                 </Card>
               ))}
             </div>

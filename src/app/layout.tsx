@@ -32,6 +32,10 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: "#0b0b0b",
+  // En Chrome/Android esto ya evita solo que el teclado tape el fondo de un
+  // diálogo fijado abajo (encoge el viewport en vez de superponerse). Safari
+  // no lo soporta — de ahí el ajuste con VisualViewport en Dialog.tsx.
+  interactiveWidget: "resizes-content",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

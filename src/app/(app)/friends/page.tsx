@@ -18,13 +18,24 @@ function formatPrValue(type: PrType, value: number): string {
   return type === "reps" ? `${value} reps` : `${value} kg`;
 }
 
+type ShareStatus = "idle" | "shared" | "copied" | "failed";
+
 export default function FriendsPage() {
   const { data: code } = useMyInviteCode();
   const { data: friends = [], isLoading: friendsLoading } = useFriends();
   const { data: prFeed = [] } = useFriendPrFeed();
   const redeem = useRedeemInviteCode();
   const [input, setInput] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [shareStatus, setShareStatus] = useState<ShareStatus>("idle");
+
+  // El share nativo (móvil) o el portapapeles (escritorio) no siempre avisan
+  // de nada por sí solos — en Windows, sin ninguna app de compartir
+  // registrada, el share sheet puede no enseñar nada y parecer que el botón
+  // no hizo nada. Este estado es la única fuente de verdad de si funcionó.
+  const flashStatus = (status: ShareStatus) => {
+    setShareStatus(status);
+    setTimeout(() => setShareStatus("idle"), status === "failed" ? 5000 : 3000);
+  };
 
   const share = async () => {
     if (!code) return;
@@ -32,17 +43,19 @@ export default function FriendsPage() {
     if (typeof navigator !== "undefined" && navigator.share) {
       try {
         await navigator.share({ title: "Veltra", text });
+        flashStatus("shared");
         return;
-      } catch {
-        // Cerró el share sheet sin elegir nada — cae al copiado como respaldo.
+      } catch (err) {
+        // Canceló el share sheet él mismo — no es un fallo, no hace falta avisar de nada.
+        if (err instanceof Error && err.name === "AbortError") return;
+        // Cualquier otro motivo (sin apps de compartir, etc.) cae al copiado.
       }
     }
     try {
       await navigator.clipboard.writeText(code);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      flashStatus("copied");
     } catch {
-      // Sin permiso de clipboard tampoco — el código ya está visible en pantalla.
+      flashStatus("failed");
     }
   };
 
@@ -87,13 +100,17 @@ export default function FriendsPage() {
             {code ?? "······"}
           </span>
           <Button
-            label={copied ? "Copiado" : "Compartir"}
+            label={shareStatus === "copied" ? "Copiado" : shareStatus === "shared" ? "Compartido" : "Compartir"}
             variant="secondary"
-            icon={copied ? <Check size={16} /> : <Copy size={16} />}
+            icon={shareStatus === "copied" || shareStatus === "shared" ? <Check size={16} /> : <Copy size={16} />}
             onClick={share}
             disabled={!code}
           />
         </div>
+        {shareStatus === "copied" ? <p className="text-progress text-xs mt-3 font-semibold">Código copiado — pégalo donde quieras enviarlo.</p> : null}
+        {shareStatus === "failed" ? (
+          <p className="text-danger text-xs mt-3 leading-5">No se pudo copiar automáticamente. Selecciona el código de arriba y cópialo a mano.</p>
+        ) : null}
       </Card>
 
       <Card raised>

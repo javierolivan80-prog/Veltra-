@@ -31,12 +31,13 @@ import { useProfile } from "@/features/profile/hooks";
 import { useRoutines } from "@/features/routines/hooks";
 import { sleptMinutes } from "@/features/sleep/calc";
 import { useSleepLogByDate, useSleepLogs } from "@/features/sleep/hooks";
+import { RoutinePickerDialog } from "@/features/workouts/RoutinePickerDialog";
 import { useActiveSession, useRecentSessions, useStartSession } from "@/features/workouts/hooks";
 import { cn } from "@/lib/cn";
 import { daysBetweenDayKeys, todayKey } from "@/lib/date";
 import { formatHoursMinutes } from "@/lib/duration";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import type { CommitmentKind } from "@/types/models";
+import type { CommitmentKind, Routine } from "@/types/models";
 
 function timeLabelOf(iso: string): { label: string; minutes: number } {
   const d = new Date(iso);
@@ -246,12 +247,20 @@ export default function DashboardPage() {
   // suelto de abajo sobraría y aparecería dos veces la misma cosa.
   const faithIsCommitment = todaysCommitments.some((c) => c.kind === "faith");
 
-  const handleStart = async () => {
+  // "Empezar entrenamiento" ya no arranca directo con la rutina en rotación:
+  // abre el selector para que la decisión sea del usuario, con la sugerida
+  // ya marcada para quien solo quiere confirmarla de un toque.
+  const [routinePickerOpen, setRoutinePickerOpen] = useState(false);
+  const handleStart = () => {
     if (activeSession) {
       router.push(`/workout/${activeSession.id}`);
       return;
     }
-    const session = await startSession.mutateAsync({ routineId: suggestedRoutine?.id ?? null, routineName: suggestedRoutine?.name ?? null });
+    setRoutinePickerOpen(true);
+  };
+  const startWithRoutine = async (routine: Routine | null) => {
+    setRoutinePickerOpen(false);
+    const session = await startSession.mutateAsync({ routineId: routine?.id ?? null, routineName: routine?.name ?? null });
     router.push(`/workout/${session.id}`);
   };
 
@@ -592,6 +601,15 @@ export default function DashboardPage() {
       <InstallPrompt eligible={arcDay !== null && arcDay >= 2} />
 
       <PlanCelebration streak={celebratedStreak} onDismiss={() => setCelebratedStreak(null)} />
+
+      <RoutinePickerDialog
+        open={routinePickerOpen}
+        onOpenChange={setRoutinePickerOpen}
+        routines={routines}
+        suggestedRoutineId={suggestedRoutine?.id ?? null}
+        onSelect={(routine) => startWithRoutine(routine)}
+        onSelectFree={() => startWithRoutine(null)}
+      />
     </div>
   );
 }

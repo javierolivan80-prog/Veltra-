@@ -26,6 +26,31 @@ export interface FriendProgress {
   updatedAt: string;
 }
 
+export type PrType = "1rm" | "weight" | "reps";
+
+export interface FriendPrEvent {
+  id: string;
+  userId: string;
+  displayName: string;
+  exerciseName: string;
+  prType: PrType;
+  value: number;
+  achievedAt: string;
+}
+
+export interface PrEventInput {
+  id: string;
+  exerciseName: string;
+  prType: PrType;
+  value: number;
+  achievedAt: string;
+}
+
+async function friendTargetIds(supabase: ReturnType<typeof getSupabaseBrowserClient>, viewerId: string): Promise<string[]> {
+  const { data: links } = await supabase!.from("friendships").select("target_id").eq("viewer_id", viewerId);
+  return (links ?? []).map((l: { target_id: string }) => l.target_id);
+}
+
 /** El código propio, creándolo la primera vez que se pide. */
 export async function getMyInviteCode(): Promise<string> {
   const supabase = getSupabaseBrowserClient()!;
@@ -74,14 +99,54 @@ export async function listFriends(): Promise<FriendProgress[]> {
   const supabase = getSupabaseBrowserClient()!;
   const viewerId = await requireUserId();
 
-  const { data: links } = await supabase.from("friendships").select("target_id").eq("viewer_id", viewerId);
-  const targetIds = (links ?? []).map((l: { target_id: string }) => l.target_id);
+  const targetIds = await friendTargetIds(supabase, viewerId);
   if (targetIds.length === 0) return [];
 
   const { data, error } = await supabase.from("friend_progress").select("*").in("user_id", targetIds);
   if (error || !data) return [];
   const rows: FriendProgress[] = data.map((r: object) => toCamelCase<FriendProgress>(r));
   return rows.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt));
+}
+
+/** Feed de PRs de tus amigos, más reciente primero — incluye ejercicios
+ *  que tú mismo no entrenes: "Javier ha sacado 80 en banca" es información
+ *  aunque tú no hagas banca. */
+export async function listFriendPrFeed(limit = 30): Promise<FriendPrEvent[]> {
+  const supabase = getSupabaseBrowserClient()!;
+  const viewerId = await requireUserId();
+
+  const targetIds = await friendTargetIds(supabase, viewerId);
+  if (targetIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from("friend_pr_events")
+    .select("*")
+    .in("user_id", targetIds)
+    .order("achieved_at", { ascending: false })
+    .limit(limit);
+  if (error || !data) return [];
+  return data.map((r: object) => toCamelCase<FriendPrEvent>(r));
+}
+
+/** Sube los PRs rotos en una serie — el entrenamiento llama a esto justo
+ *  después de registrar la serie, con los mismos prsBroken que ya usa para
+ *  su propia celebración. */
+export async function pushPrEvents(displayName: string, events: PrEventInput[]): Promise<void> {
+  if (events.length === 0) return;
+  const supabase = getSupabaseBrowserClient()!;
+  const userId = await requireUserId();
+  const rows = events.map((e) =>
+    toSnakeCase({
+      id: e.id,
+      userId,
+      displayName,
+      exerciseName: e.exerciseName,
+      prType: e.prType,
+      value: e.value,
+      achievedAt: e.achievedAt,
+    })
+  );
+  await supabase.from("friend_pr_events").insert(rows);
 }
 
 /** Sube tu propio progreso — Hoy lo llama cada vez que arcDay/streak cambian. */

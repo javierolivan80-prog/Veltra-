@@ -10,6 +10,7 @@ import { Stepper } from "@/design-system/components/Stepper";
 import { ExercisePickerDialog } from "@/features/exercises/ExercisePickerDialog";
 import { useExercises } from "@/features/exercises/hooks";
 import { computeRank, isRankEligible } from "@/features/exercises/ranks";
+import { usePushPrEvents } from "@/features/friends/hooks";
 import { useProfile } from "@/features/profile/hooks";
 import { useRoutine } from "@/features/routines/hooks";
 import { lastSessionSetsFor, suggestWeightAdjustment } from "@/features/workouts/difficultyAdjust";
@@ -27,6 +28,7 @@ import {
 import { primeAlerts } from "@/lib/alert";
 import { cn } from "@/lib/cn";
 import { formatDuration, formatWeight } from "@/lib/format";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { useWorkoutSessionStore } from "@/state/workoutSession.store";
 import type { Exercise, PersonalRecord, RankTier } from "@/types/models";
 
@@ -61,6 +63,7 @@ export default function ActiveWorkoutPage() {
   const { data: sessionSets = [] } = useSessionSets(sessionId ?? null);
   const { data: profile } = useProfile();
   const addSet = useAddSet();
+  const pushPrEvents = usePushPrEvents();
   const endSession = useEndSession();
   const deleteSession = useDeleteSession();
   const deleteSet = useDeleteSet();
@@ -161,6 +164,17 @@ export default function ActiveWorkoutPage() {
 
       const oneRmPr = result.prsBroken.find((p) => p.type === "1rm");
       const exerciseFull = allExercises.find((e) => e.id === current.exerciseId);
+
+      // Amigos ve el feed de PRs aunque no entrenen este ejercicio — se sube
+      // en cuanto se rompe, antes de que ninguna celebración decida si
+      // sigue o corta con un return.
+      if (isSupabaseConfigured && exerciseFull && profile && result.prsBroken.length > 0) {
+        pushPrEvents.mutate({
+          displayName: profile.fullName,
+          events: result.prsBroken.map((pr) => ({ id: pr.id, exerciseName: exerciseFull.name, prType: pr.type, value: pr.value, achievedAt: pr.achievedAt })),
+        });
+      }
+
       if (oneRmPr && exerciseFull && profile?.bodyweightKg && isRankEligible(exerciseFull)) {
         const rankInput = { exercise: exerciseFull, bodyweightKg: profile.bodyweightKg, sex: profile.sex, birthDate: profile.birthDate, experienceLevel: profile.experienceLevel };
         const newRank = computeRank({ ...rankInput, oneRmKg: oneRmPr.value });

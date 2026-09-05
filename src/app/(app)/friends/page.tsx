@@ -1,18 +1,27 @@
 "use client";
 
-import { Check, Copy, Flame, Users } from "lucide-react";
+import { Check, Copy, Flame, Trophy, Users } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/design-system/components/Button";
 import { Card } from "@/design-system/components/Card";
 import { CategoryBackLink } from "@/design-system/components/CategoryBackLink";
 import { EmptyState } from "@/design-system/components/EmptyState";
 import { TextField } from "@/design-system/components/TextField";
-import { useFriends, useMyInviteCode, useRedeemInviteCode } from "@/features/friends/hooks";
+import { useFriendPrFeed, useFriends, useMyInviteCode, useRedeemInviteCode } from "@/features/friends/hooks";
+import type { PrType } from "@/features/friends/repo";
+import { formatRelativeTime } from "@/lib/format";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
+
+const PR_LABEL: Record<PrType, string> = { "1rm": "1RM estimado", weight: "peso", reps: "repeticiones" };
+
+function formatPrValue(type: PrType, value: number): string {
+  return type === "reps" ? `${value} reps` : `${value} kg`;
+}
 
 export default function FriendsPage() {
   const { data: code } = useMyInviteCode();
   const { data: friends = [], isLoading: friendsLoading } = useFriends();
+  const { data: prFeed = [] } = useFriendPrFeed();
   const redeem = useRedeemInviteCode();
   const [input, setInput] = useState("");
   const [copied, setCopied] = useState(false);
@@ -139,6 +148,29 @@ export default function FriendsPage() {
           </div>
         )}
       </div>
+
+      {prFeed.length > 0 ? (
+        <div>
+          <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em] mb-2.5">Récords recientes</p>
+          <div className="flex flex-col gap-2.5">
+            {prFeed.map((pr) => (
+              <div key={pr.id} className="flex items-start gap-3 border border-line-subtle rounded-2xl bg-bg-soft px-4 py-3.5">
+                <span className="w-9 h-9 rounded-full bg-record/15 flex items-center justify-center shrink-0">
+                  <Trophy size={16} className="text-record" />
+                </span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-ink text-sm leading-5">
+                    <span className="font-semibold">{pr.displayName}</span> — {pr.exerciseName}: {formatPrValue(pr.prType, pr.value)}
+                  </p>
+                  <p className="text-ink-faint text-xs mt-0.5">
+                    {PR_LABEL[pr.prType]} · {formatRelativeTime(pr.achievedAt)}
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 }

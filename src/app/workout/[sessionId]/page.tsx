@@ -26,7 +26,6 @@ import {
 } from "@/features/workouts/hooks";
 import { primeAlerts } from "@/lib/alert";
 import { cn } from "@/lib/cn";
-import { errorMessage } from "@/lib/errors";
 import { formatDuration, formatWeight } from "@/lib/format";
 import { useWorkoutSessionStore } from "@/state/workoutSession.store";
 import type { Exercise, PersonalRecord, RankTier } from "@/types/models";
@@ -174,10 +173,10 @@ export default function ActiveWorkoutPage() {
 
       const best = PR_PRIORITY.map((t) => result.prsBroken.find((p) => p.type === t)).find(Boolean);
       if (best) setCelebrating(best);
-    } catch (err) {
-      // Without this, a failed tap (auth/network hiccup, etc.) looked like the
-      // button did nothing at all, and the set was silently never logged.
-      alert(errorMessage(err, "No se pudo registrar la serie. Inténtalo de nuevo."));
+    } catch {
+      // El toast global (MutationCache en lib/queryClient.ts) ya avisa del
+      // fallo — sin este catch, un tap fallido parecía que el botón no
+      // había hecho nada en absoluto.
     } finally {
       isLoggingSet.current = false;
     }

@@ -20,6 +20,7 @@ import { PlanCelebration } from "@/design-system/components/PlanCelebration";
 import { KIND_HREF, SLOT_LABEL, SLOT_ORDER } from "@/features/contract/catalogue";
 import { contractKeys, useActiveContract, useCommitments } from "@/features/contract/hooks";
 import { popAdaptiveNotices } from "@/features/contract/notices";
+import { usePushMyProgress } from "@/features/friends/hooks";
 import { useFocusSessions } from "@/features/focus/hooks";
 import { useAllFoodMeals, useDailyNutrition } from "@/features/food/hooks";
 import { useJournalEntries, useJournalEntryByDate } from "@/features/journaling/hooks";
@@ -34,6 +35,7 @@ import { useActiveSession, useRecentSessions, useStartSession } from "@/features
 import { cn } from "@/lib/cn";
 import { daysBetweenDayKeys, todayKey } from "@/lib/date";
 import { formatHoursMinutes } from "@/lib/duration";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { CommitmentKind } from "@/types/models";
 
 function timeLabelOf(iso: string): { label: string; minutes: number } {
@@ -376,6 +378,21 @@ export default function DashboardPage() {
   const visibleItems = minimalMode ? sorted.slice(0, 1) : sorted;
   const doneCount = items.filter((i) => i.state === "done").length;
   const arcDay = contract ? dayOfArc(contract, today) : null;
+  const planStreak = useMemo(
+    () => (contract ? computePlanStreak(commitments, doneDaysByKind, contract.startedOn, today) : 0),
+    [contract, commitments, doneDaysByKind, today]
+  );
+
+  // Amigos (Fase 6) solo lee de friend_progress, nunca de contracts u otras
+  // tablas de módulos — así que es Hoy quien sube el resultado ya calculado
+  // en vez de ampliar el RLS de todo lo demás para que otro usuario pueda
+  // leerlo directamente.
+  const pushProgress = usePushMyProgress();
+  useEffect(() => {
+    if (!isSupabaseConfigured || !profile || !contract) return;
+    pushProgress.mutate({ displayName: profile.fullName, arcDay, arcDurationDays: contract.durationDays, streak: planStreak });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.fullName, contract?.id, arcDay, planStreak]);
 
   // El día completo se celebra una vez y ya: recargar Hoy después no vuelve
   // a lanzarlo, porque entonces dejaría de ser un momento y sería un cartel.

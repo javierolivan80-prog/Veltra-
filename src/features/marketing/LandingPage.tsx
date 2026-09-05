@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { Logo } from "@/design-system/components/Logo";
+import { isWinterArcSeason } from "./season";
 
 const MODULES: { icon: LucideIcon; label: string; color: string }[] = [
   { icon: Dumbbell, label: "Entrenamiento", color: "text-progress" },
@@ -48,6 +49,12 @@ const STEPS = [
 ];
 
 export function LandingPage() {
+  // Mismo Contrato, mismo motor — solo cambia cómo se presenta en la
+  // temporada en la que "empezar de cero" es una búsqueda real (nov-feb).
+  // Fuera de esa ventana se queda en el encuadre genérico de siempre.
+  const winterSeason = isWinterArcSeason();
+  const eyebrow = winterSeason ? "Reto de invierno · arco de 90 días" : "Un arco de 30, 60 o 90 días";
+
   return (
     <div className="min-h-screen bg-bg text-ink">
       <header className="flex items-center justify-between px-6 py-6 max-w-5xl mx-auto">
@@ -66,7 +73,7 @@ export function LandingPage() {
             transition={{ duration: 0.4 }}
             className="text-progress text-[11px] font-bold uppercase tracking-[.16em] border border-progress/25 bg-progress-bg rounded-full px-3 py-1.5 mb-6"
           >
-            Un arco de 30, 60 o 90 días
+            {eyebrow}
           </motion.span>
           <motion.h1
             initial={{ opacity: 0, y: 12 }}

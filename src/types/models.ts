@@ -69,6 +69,9 @@ export interface Profile {
   recoveryEnabled: boolean;
   /** Fe católica — mismo patrón que Recuperación: opcional, se activa aquí. */
   faithEnabled: boolean;
+  /** IANA tz capturada client-side en cada guardado del perfil — la usan los
+   *  avisos push que dependen de la hora local del usuario (contrato). */
+  timezone: string | null;
   createdAt: string;
   updatedAt: string;
 }

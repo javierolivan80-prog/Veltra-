@@ -1,21 +1,26 @@
 "use client";
 
-import { Book, Brain, Check, Cross, Dumbbell, Lightbulb, Moon, Play, Target, UtensilsCrossed, X, type LucideIcon } from "lucide-react";
+import { AlertTriangle, Book, Brain, Check, Cross, Dumbbell, Lightbulb, Moon, Play, Target, UtensilsCrossed, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { useApplyAutoReductions, type DoneDaysByKind } from "@/features/contract/adaptive";
-import { commitmentsForDay, dayOfArc } from "@/features/contract/arc";
+import { ArcCompletion } from "@/features/contract/ArcCompletion";
+import { commitmentsForDay, dayOfArc, isArcOver } from "@/features/contract/arc";
+import { buildMotivationalNudges } from "@/features/contract/nudges";
 import { computePlanStreak } from "@/features/contract/streak";
+import { updateContractStatus } from "@/features/contract/repo";
 import { useFaithCheckInByDate, useFaithCheckIns } from "@/features/faith/hooks";
 import { faithDoneCount, faithDoneDays } from "@/features/faith/stats";
 import { useInsights } from "@/features/insights/hooks";
 import { InstallPrompt } from "@/features/pwa/InstallPrompt";
 import { PlanCelebration } from "@/design-system/components/PlanCelebration";
 import { KIND_HREF, SLOT_LABEL, SLOT_ORDER } from "@/features/contract/catalogue";
-import { useActiveContract, useCommitments } from "@/features/contract/hooks";
+import { contractKeys, useActiveContract, useCommitments } from "@/features/contract/hooks";
 import { popAdaptiveNotices } from "@/features/contract/notices";
+import { usePushMyProgress } from "@/features/friends/hooks";
 import { useFocusSessions } from "@/features/focus/hooks";
 import { useAllFoodMeals, useDailyNutrition } from "@/features/food/hooks";
 import { useJournalEntries, useJournalEntryByDate } from "@/features/journaling/hooks";
@@ -30,6 +35,7 @@ import { useActiveSession, useRecentSessions, useStartSession } from "@/features
 import { cn } from "@/lib/cn";
 import { daysBetweenDayKeys, todayKey } from "@/lib/date";
 import { formatHoursMinutes } from "@/lib/duration";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { CommitmentKind } from "@/types/models";
 
 function timeLabelOf(iso: string): { label: string; minutes: number } {
@@ -111,6 +117,7 @@ interface DayItem {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const today = todayKey();
   const [nowMs] = useState(() => Date.now());
   const { data: contract } = useActiveContract();
@@ -190,6 +197,10 @@ export default function DashboardPage() {
   const ateToday = (nutrition?.mealCount ?? 0) > 0;
 
   const todaysCommitments = useMemo(() => commitmentsForDay(commitments, today), [commitments, today]);
+  const motivationalNudges = useMemo(
+    () => buildMotivationalNudges(todaysCommitments, doneDaysByKind, today, contract?.why ?? null),
+    [todaysCommitments, doneDaysByKind, today, contract?.why]
+  );
 
   // Ninguna tarjeta puede ser solo una petición de datos: cuando hoy no hay
   // nada que registrar, cada una devuelve el agregado de los últimos 7 días
@@ -242,6 +253,18 @@ export default function DashboardPage() {
     }
     const session = await startSession.mutateAsync({ routineId: suggestedRoutine?.id ?? null, routineName: suggestedRoutine?.name ?? null });
     router.push(`/workout/${session.id}`);
+  };
+
+  // El arco tiene fecha de fin: pasado endsOn no queda ningún día del plan
+  // que mostrar. Antes de hoy, esto simplemente no pasaba nada — dayOfArc
+  // se quedaba clavado en durationDays y la app seguía enseñando un plan de
+  // un contrato que ya había terminado.
+  const arcOver = contract ? isArcOver(contract, today) : false;
+  const handleStartNewArc = async () => {
+    if (!contract) return;
+    await updateContractStatus(contract.id, "completed");
+    await qc.invalidateQueries({ queryKey: contractKeys.all });
+    router.push("/onboarding/contract");
   };
 
   /** Cada compromiso resuelto contra lo que el usuario ya ha registrado hoy. */
@@ -355,6 +378,21 @@ export default function DashboardPage() {
   const visibleItems = minimalMode ? sorted.slice(0, 1) : sorted;
   const doneCount = items.filter((i) => i.state === "done").length;
   const arcDay = contract ? dayOfArc(contract, today) : null;
+  const planStreak = useMemo(
+    () => (contract ? computePlanStreak(commitments, doneDaysByKind, contract.startedOn, today) : 0),
+    [contract, commitments, doneDaysByKind, today]
+  );
+
+  // Amigos (Fase 6) solo lee de friend_progress, nunca de contracts u otras
+  // tablas de módulos — así que es Hoy quien sube el resultado ya calculado
+  // en vez de ampliar el RLS de todo lo demás para que otro usuario pueda
+  // leerlo directamente.
+  const pushProgress = usePushMyProgress();
+  useEffect(() => {
+    if (!isSupabaseConfigured || !profile || !contract) return;
+    pushProgress.mutate({ displayName: profile.fullName, arcDay, arcDurationDays: contract.durationDays, streak: planStreak });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.fullName, contract?.id, arcDay, planStreak]);
 
   // El día completo se celebra una vez y ya: recargar Hoy después no vuelve
   // a lanzarlo, porque entonces dejaría de ser un momento y sería un cartel.
@@ -397,6 +435,10 @@ export default function DashboardPage() {
         </div>
       ) : null}
 
+      {arcOver && contract ? (
+        <ArcCompletion contract={contract} commitments={commitments} doneDaysByKind={doneDaysByKind} onStartNew={handleStartNewArc} />
+      ) : (
+        <>
       <div>
         <div className="flex items-end justify-between mb-2">
           <h1 className="text-ink font-display font-semibold text-[26px] leading-tight tracking-tight">Tu día</h1>
@@ -417,6 +459,17 @@ export default function DashboardPage() {
           />
         </div>
       </div>
+
+      {motivationalNudges.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {motivationalNudges.map((nudge) => (
+            <div key={nudge.commitmentId} className="flex items-start gap-2.5 border border-warn/30 rounded-xl bg-warn/10 px-3.5 py-3">
+              <AlertTriangle size={15} className="text-warn shrink-0 mt-0.5" />
+              <p className="text-ink text-sm leading-5 flex-1">{nudge.message}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {minimalMode && sorted.length > 0 && contract?.why ? (
         <div className="border border-line-subtle rounded-2xl bg-surface px-4 py-4">
@@ -491,6 +544,8 @@ export default function DashboardPage() {
             })}
           </div>
         </div>
+      )}
+        </>
       )}
 
       {cleanDays !== null ? (

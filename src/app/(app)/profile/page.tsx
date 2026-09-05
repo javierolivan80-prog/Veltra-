@@ -1,6 +1,6 @@
 "use client";
 
-import { ChevronRight, Cross, ExternalLink, Scale, ShieldAlert, Trash2 } from "lucide-react";
+import { ChevronRight, Cross, ExternalLink, Scale, ShieldAlert, Trash2, Users } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { Badge } from "@/design-system/components/Badge";
@@ -275,6 +275,24 @@ export default function ProfilePage() {
               Error: {setFaithEnabled.error instanceof Error ? setFaithEnabled.error.message : JSON.stringify(setFaithEnabled.error)}
             </p>
           ) : null}
+        </Card>
+      </div>
+
+      <div>
+        <SectionHeader title="Amigos" />
+        <Card raised>
+          <Link href="/friends" className="flex items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <span className="w-9 h-9 rounded-full bg-progress/15 flex items-center justify-center shrink-0">
+                <Users size={17} className="text-progress" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-ink text-sm font-semibold">Tu código y quién sigues</p>
+                <p className="text-ink-dim text-xs mt-0.5">Solo ven tu racha y tu día de arco</p>
+              </div>
+            </div>
+            <ChevronRight size={18} className="text-ink-faint shrink-0" />
+          </Link>
         </Card>
       </div>
 

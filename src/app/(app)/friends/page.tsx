@@ -21,7 +21,7 @@ function formatPrValue(type: PrType, value: number): string {
 type ShareStatus = "idle" | "shared" | "copied" | "failed";
 
 export default function FriendsPage() {
-  const { data: code } = useMyInviteCode();
+  const { data: code, isError: codeError, error: codeErrorDetail, isLoading: codeLoading } = useMyInviteCode();
   const { data: friends = [], isLoading: friendsLoading } = useFriends();
   const { data: prFeed = [] } = useFriendPrFeed();
   const redeem = useRedeemInviteCode();
@@ -97,7 +97,7 @@ export default function FriendsPage() {
         </p>
         <div className="flex items-center gap-3">
           <span className="flex-1 font-display font-bold text-2xl tracking-[.2em] text-ink bg-bg-soft border border-line-subtle rounded-xl px-4 py-3 text-center">
-            {code ?? "······"}
+            {codeLoading ? "······" : code ?? "Error"}
           </span>
           <Button
             label={shareStatus === "copied" ? "Copiado" : shareStatus === "shared" ? "Compartido" : "Compartir"}
@@ -110,6 +110,12 @@ export default function FriendsPage() {
         {shareStatus === "copied" ? <p className="text-progress text-xs mt-3 font-semibold">Código copiado — pégalo donde quieras enviarlo.</p> : null}
         {shareStatus === "failed" ? (
           <p className="text-danger text-xs mt-3 leading-5">No se pudo copiar automáticamente. Selecciona el código de arriba y cópialo a mano.</p>
+        ) : null}
+        {codeError ? (
+          <p className="text-danger text-xs mt-3 leading-5">
+            No se pudo generar tu código: {codeErrorDetail instanceof Error ? codeErrorDetail.message : "error desconocido"}. Recarga la página para
+            reintentarlo.
+          </p>
         ) : null}
       </Card>
 

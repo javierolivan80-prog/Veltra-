@@ -2,8 +2,10 @@
 //
 // Routes by the request body's `type` field:
 //   - "coach" (default): the personal-trainer chat. Receives a grounded
-//     context bundle (profile, injuries, sessions, PRs…) and returns a reply
-//     plus any memory facts to remember.
+//     context bundle (profile, injuries, routines, sets, volume, PRs…) and
+//     returns a reply plus any memory facts to remember. Has web search, so
+//     it can cite actual current research instead of only what the model
+//     happens to remember from training.
 //   - "food": Veltra Food. Receives the user's text + meal photos + the day's
 //     nutrition context and returns a reply plus a structured meal (foods and
 //     macros) to register. Text quantities take priority over the visual
@@ -11,11 +13,14 @@
 //
 // Required secrets (set via Edge Functions → Secrets):
 //   ANTHROPIC_API_KEY   — Claude API key (never exposed to the client)
-//   ANTHROPIC_MODEL     — optional, defaults to claude-sonnet-5
+//   ANTHROPIC_MODEL     — optional, defaults to claude-opus-5. Si lo fijas a
+//                         mano, tiene que ser un modelo con búsqueda web
+//                         (Opus 5/4.8/4.7/4.6, Sonnet 5, Sonnet 4.6).
 
+import Anthropic from "npm:@anthropic-ai/sdk";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const ANTHROPIC_MODEL = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-sonnet-5";
+const ANTHROPIC_MODEL = Deno.env.get("ANTHROPIC_MODEL") ?? "claude-opus-5";
 const ANTHROPIC_API_KEY = Deno.env.get("ANTHROPIC_API_KEY");
 
 const CORS_HEADERS = {
@@ -38,19 +43,36 @@ interface CoachContext {
   laggingMuscleGroups: string;
   nutritionSummary?: string;
   wellbeingSummary?: string;
+  routinesSummary?: string;
+  recentSetsSummary?: string;
+  weeklyVolumeSummary?: string;
 }
 
 function buildCoachSystemPrompt(ctx: CoachContext): string {
-  return `Eres el entrenador personal de élite dentro de la app Veltra. Hablas en español, con tono cercano pero profesional — como un entrenador que lleva años acompañando a este usuario, no un chatbot genérico.
+  return `Eres el entrenador personal de élite dentro de la app Veltra: un especialista en ciencia del entrenamiento de fuerza e hipertrofia, del nivel de alguien que lee la literatura de primera mano. Hablas en español, con tono cercano pero profesional — como un entrenador que lleva años acompañando a este usuario, no un chatbot genérico.
 
-REGLAS ESTRICTAS:
-- Solo puedes usar los datos reales proporcionados abajo. Nunca inventes pesos, fechas ni marcas que no estén en el contexto.
+TU ESPECIALIDAD:
+Dominas y razonas con los mecanismos reales del entrenamiento: volumen (series efectivas por grupo muscular y semana, y sus rendimientos decrecientes), intensidad y proximidad al fallo (RIR/RPE), frecuencia, selección de ejercicios y perfil de resistencia, rango de recorrido y longitud muscular, progresión de carga, periodización, gestión de fatiga y descargas, tempo y descansos, síntesis proteica y recuperación, y la readaptación tras una lesión. Cuando el usuario te pregunte por cualquiera de esto, respondes como el especialista que eres — no con generalidades de revista.
+
+EVIDENCIA E INVESTIGACIÓN:
+- Tienes una herramienta de búsqueda web. ÚSALA siempre que la pregunta dependa de qué dice la evidencia actual: estudios recientes, metaanálisis, revisiones, debates abiertos del campo (p. ej. entrenar al fallo, series efectivas, frecuencia óptima, estiramiento bajo carga, cardio concurrente, suplementos), o cuando el usuario te pida directamente estudios, "research" o qué hay nuevo. Búscalo y responde con lo que hayas encontrado, no de memoria.
+- Cuando cites un estudio o metaanálisis, di de qué va, quién y de qué año es, y qué encontró en concreto. Sé honesto con la calidad de la evidencia: tamaño de muestra, población (novatos vs entrenados), duración, conflictos de interés y si el efecto es grande o marginal en la práctica.
+- No hace falta que busques para lo básico y bien establecido, ni para preguntas sobre los datos del propio usuario. Buscar cuesta tiempo: hazlo cuando aporte, no por rutina.
+- Distingue siempre lo que dice la evidencia de lo que es tu criterio de entrenador. Ambas cosas valen; mezclarlas sin avisar, no.
+
+REGLAS ESTRICTAS SOBRE SUS DATOS:
+- Sobre EL USUARIO solo puedes usar los datos reales proporcionados abajo. Nunca inventes pesos, series, fechas ni marcas que no estén en el contexto. (Esto no limita tu conocimiento de fisiología ni lo que encuentres buscando: ahí eres libre.)
 - Si no tienes datos suficientes para responder algo con precisión, dilo abiertamente y explica qué haría falta registrar.
-- Sé conciso: 2-4 frases salvo que el usuario pida un análisis largo o una rutina completa.
-- Cuando dés una recomendación, explica brevemente el motivo apoyándote en los datos.
+- Cuando dés una recomendación, explica el motivo apoyándote en sus datos reales y, si viene a cuento, en la evidencia.
 - Si detectas que el usuario menciona una lesión, molestia o restricción nueva, sigue las reglas de memoria abajo.
 - Tienes acceso a lo que come (sección Nutrición). Úsalo cuando sea relevante para explicar el rendimiento o el progreso (p. ej. si lleva días muy por debajo de su objetivo de proteína o de calorías). No lo menciones si no viene a cuento.
 - Tienes acceso a patrones cruzados entre sueño, ánimo y actividad (sección Bienestar). Si hay uno detectado y viene a cuento, apóyate en él para explicar un bajón de rendimiento o motivar un cambio concreto — no lo repitas si no aporta nada a la conversación, y nunca afirmes un patrón que no esté ahí.
+
+ANÁLISIS DE RUTINAS Y SERIES:
+Tienes sus rutinas tal y como están escritas (ejercicio, series objetivo, rango de repeticiones, descanso), sus últimas sesiones serie a serie con peso, repeticiones y RIR, y su volumen semanal por grupo muscular. Cuando te pidan analizar una rutina o su progresión, entra al detalle de verdad: si un grupo va corto o pasado de volumen, si la progresión está estancada, si el RIR indica que se queda lejos del fallo, si faltan patrones de movimiento o si el reparto entre sesiones no cuadra. Propón cambios concretos (ejercicio, series, repeticiones, carga), no consejos vagos.
+
+LONGITUD:
+Ajústala a la pregunta, sin límite fijo: una duda simple se responde en 2-4 frases; un análisis de rutina, una programación completa o una revisión de evidencia ocupan lo que haga falta. No recortes un análisis que te han pedido a fondo.
 
 SUSTANCIAS Y RENDIMIENTO:
 Si preguntan por esteroides anabólicos, SARMs, péptidos u otras sustancias relacionadas con el rendimiento (por ejemplo comparar potencia anabólica entre compuestos, o qué efectos secundarios tiene alguno en concreto), responde con información factual, comparativa y educativa — igual que con cualquier otro tema de fisiología, sin evasivas ni sermones. Puedes explicar efectos conocidos, por qué un compuesto es más androgénico o anabólico que otro, y sus perfiles de riesgo reales. No conviertas la respuesta en una advertencia genérica si no la han pedido.
@@ -61,8 +83,13 @@ CONTEXTO REAL DEL USUARIO:
 - Lesiones activas: ${ctx.injuriesSummary}
 - Memoria guardada de conversaciones anteriores:
 ${ctx.memorySummary}
+- Sus rutinas:
+${ctx.routinesSummary ?? "  Sin rutinas registradas."}
 - Sesiones recientes:
 ${ctx.recentSessionsSummary}
+- Últimas sesiones serie a serie:
+${ctx.recentSetsSummary ?? "  Sin series registradas."}
+- Volumen semanal por grupo muscular (media de las últimas 4 semanas): ${ctx.weeklyVolumeSummary ?? "Sin datos de volumen."}
 - Mejores marcas actuales: ${ctx.strongestLifts}
 - Grupos musculares menos entrenados recientemente: ${ctx.laggingMuscleGroups}
 - Nutrición (Veltra Food): ${ctx.nutritionSummary ?? "Sin datos de nutrición."}
@@ -89,6 +116,10 @@ function extractMemoryUpdates(text: string): { reply: string; memoryFacts: { con
 async function handleCoach(body: any): Promise<Response> {
   const raw = await callAnthropic({
     system: buildCoachSystemPrompt(body.context),
+    // Un análisis de rutina entero o una revisión de evidencia no caben en las
+    // 700 de antes: ahí es donde se cortaba a media frase.
+    maxTokens: 8000,
+    webSearch: true,
     messages: [
       ...(body.history ?? []).map((m: HistoryMsg) => ({ role: m.role, content: m.content })),
       { role: "user", content: body.message },
@@ -235,6 +266,9 @@ async function handleFood(body: any): Promise<Response> {
   const raw = await callAnthropic({
     system: buildFoodSystemPrompt(body.context),
     maxTokens: 1500,
+    // Estimar macros de una foto no necesita el razonamiento largo del coach,
+    // y aquí la latencia se nota: el usuario está esperando para registrar.
+    effort: "low",
     messages: [
       ...(body.history ?? []).map((m: HistoryMsg) => ({ role: m.role, content: m.content })),
       { role: "user", content: userContent },
@@ -248,30 +282,46 @@ async function handleFood(body: any): Promise<Response> {
 // Anthropic call + helpers
 // ---------------------------------------------------------------------
 
-async function callAnthropic(opts: { system: string; messages: any[]; maxTokens?: number }): Promise<string> {
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method: "POST",
-    headers: {
-      "content-type": "application/json",
-      "x-api-key": ANTHROPIC_API_KEY!,
-      "anthropic-version": "2023-06-01",
-    },
-    body: JSON.stringify({
-      model: ANTHROPIC_MODEL,
-      max_tokens: opts.maxTokens ?? 700,
-      system: opts.system,
-      messages: opts.messages,
-    }),
-  });
-  if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Anthropic API error: ${errText}`);
+async function callAnthropic(opts: {
+  system: string;
+  messages: Anthropic.MessageParam[];
+  maxTokens?: number;
+  /** Coach: alta por defecto. Food estima macros y va con prisa, no necesita tanta. */
+  effort?: "low" | "medium" | "high";
+  /** Solo el coach: le deja consultar la investigación actual en vez de tirar de memoria. */
+  webSearch?: boolean;
+}): Promise<string> {
+  const client = new Anthropic({ apiKey: ANTHROPIC_API_KEY! });
+  const params = {
+    model: ANTHROPIC_MODEL,
+    max_tokens: opts.maxTokens ?? 2000,
+    system: opts.system,
+    messages: opts.messages,
+    thinking: { type: "adaptive" as const },
+    output_config: { effort: opts.effort ?? "high" },
+    ...(opts.webSearch ? { tools: [{ type: "web_search_20260209" as const, name: "web_search" as const, max_uses: 5 }] } : {}),
+  };
+
+  let response = await client.messages.create(params);
+
+  // Con búsqueda web el servidor corre su propio bucle y, si se le acaban las
+  // iteraciones, devuelve stop_reason "pause_turn" a medio razonar. Se
+  // reenvía la conversación con el turno pausado y el servidor la retoma
+  // donde iba (sin añadir ningún "continúa" — lo detecta él solo).
+  const messages = [...opts.messages];
+  for (let i = 0; i < 3 && response.stop_reason === "pause_turn"; i++) {
+    messages.push({ role: "assistant", content: response.content });
+    response = await client.messages.create({ ...params, messages });
   }
-  const data = await res.json();
-  // Don't assume the text block is content[0] — some models prepend other
-  // block types, which would silently make the reply come out empty.
-  const textBlock = (data.content ?? []).find((b: { type: string; text?: string }) => b.type === "text");
-  return textBlock?.text ?? "";
+
+  // Al buscar, la respuesta llega troceada: texto, resultados de búsqueda, más
+  // texto. Quedarse con el primer bloque de texto (lo que hacía antes) se
+  // dejaría fuera justo la parte redactada DESPUÉS de buscar.
+  return response.content
+    .filter((b): b is Anthropic.TextBlock => b.type === "text")
+    .map((b) => b.text)
+    .join("\n")
+    .trim();
 }
 
 function json(payload: unknown, status = 200): Response {

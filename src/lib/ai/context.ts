@@ -1,14 +1,15 @@
 import { listPersonalRecords } from "@/features/exercises/prs";
 import { listExercises } from "@/features/exercises/repo";
 import { isRankEligible } from "@/features/exercises/ranks";
-import { getSetsForExercise, listRecentSessions, getExerciseIdsInSession } from "@/features/workouts/repo";
+import { getSessionSets, getSetsForExercise, listAllSets, listRecentSessions, getExerciseIdsInSession } from "@/features/workouts/repo";
+import { listRoutines } from "@/features/routines/repo";
 import { listMemoryFacts } from "@/features/coach/repo";
 import { dayKey } from "@/features/food/dates";
 import { getDailyNutrition, getNutritionGoals } from "@/features/food/repo";
 import { computeInsights } from "@/features/insights/signals";
 import { getProfile, listInjuries } from "@/features/profile/repo";
 import { weeklyFrequency } from "@/features/exercises/stats";
-import type { Exercise } from "@/types/models";
+import type { Exercise, MuscleGroup, SetEntry } from "@/types/models";
 
 export interface CoachContext {
   profileSummary: string;
@@ -19,6 +20,98 @@ export interface CoachContext {
   laggingMuscleGroups: string;
   nutritionSummary: string;
   wellbeingSummary: string;
+  routinesSummary: string;
+  recentSetsSummary: string;
+  weeklyVolumeSummary: string;
+}
+
+const MUSCLE_LABEL: Record<MuscleGroup, string> = {
+  chest: "Pecho", back: "Espalda", shoulders: "Hombros", biceps: "Bíceps", triceps: "Tríceps", forearms: "Antebrazos",
+  quads: "Cuádriceps", hamstrings: "Isquios", glutes: "Glúteos", calves: "Gemelos", abs: "Abdomen", traps: "Trapecios",
+  cardio: "Cardio", full_body: "Cuerpo completo",
+};
+
+/**
+ * Las rutinas tal y como están escritas: ejercicio, series objetivo, rango de
+ * repeticiones y descanso. Sin esto el coach puede hablar del historial pero
+ * no del PLAN — no podría decir "en tu Push Day tienes 4 series de press a
+ * 8-12, súbelas a 5" porque literalmente no sabe qué hay dentro de la rutina.
+ */
+function buildRoutinesSummary(routines: Awaited<ReturnType<typeof listRoutines>>, exercises: Exercise[]): string {
+  if (routines.length === 0) return "El usuario todavía no tiene ninguna rutina creada.";
+  return routines
+    .map((routine) => {
+      const lines = [...routine.exercises]
+        .sort((a, b) => a.order - b.order)
+        .map((re) => {
+          const name = exercises.find((e) => e.id === re.exerciseId)?.name ?? "Ejercicio desconocido";
+          return `    · ${name}: ${re.targetSets}x${re.targetRepsMin}-${re.targetRepsMax}, descanso ${re.restSeconds}s`;
+        });
+      return `  ${routine.name} (${routine.exercises.length} ejercicios):\n${lines.join("\n")}`;
+    })
+    .join("\n");
+}
+
+/**
+ * Serie a serie de las últimas sesiones — peso × reps y RIR. Es el nivel de
+ * detalle que hace falta para juzgar progresión real, proximidad al fallo o
+ * si alguien lleva semanas moviendo el mismo peso; el resumen por sesión
+ * (solo nombres de ejercicios) no da para ninguna de las tres.
+ */
+async function buildRecentSetsSummary(
+  sessions: Awaited<ReturnType<typeof listRecentSessions>>,
+  exercises: Exercise[]
+): Promise<string> {
+  const blocks: string[] = [];
+  for (const session of sessions.slice(0, 4)) {
+    const sets = (await getSessionSets(session.id)).filter((s) => !s.isWarmup);
+    if (sets.length === 0) continue;
+
+    const byExercise = new Map<string, SetEntry[]>();
+    for (const s of sets) {
+      const arr = byExercise.get(s.exerciseId);
+      if (arr) arr.push(s);
+      else byExercise.set(s.exerciseId, [s]);
+    }
+
+    const lines = [...byExercise.entries()].map(([exerciseId, exSets]) => {
+      const name = exercises.find((e) => e.id === exerciseId)?.name ?? "Ejercicio desconocido";
+      const detail = exSets
+        .sort((a, b) => a.setNumber - b.setNumber)
+        .map((s) => `${s.weightKg}kg×${s.reps}${s.rir !== null ? ` (RIR ${s.rir})` : ""}`)
+        .join(", ");
+      return `    · ${name}: ${detail}`;
+    });
+    blocks.push(`  ${session.startedAt.slice(0, 10)} — ${session.routineName ?? "Sesión libre"}:\n${lines.join("\n")}`);
+  }
+  return blocks.join("\n") || "Sin series registradas todavía.";
+}
+
+/**
+ * Series semanales por grupo muscular en las últimas 4 semanas — la métrica
+ * con la que la literatura de hipertrofia habla de volumen, así que es la que
+ * el coach necesita para opinar sobre si un grupo va corto o pasado.
+ * Un ejercicio cuenta para todos sus grupos, como se cuenta habitualmente.
+ */
+function buildWeeklyVolumeSummary(allSets: SetEntry[], exercises: Exercise[]): string {
+  const cutoff = Date.now() - 28 * 86400000;
+  const recent = allSets.filter((s) => !s.isWarmup && new Date(s.completedAt).getTime() >= cutoff);
+  if (recent.length === 0) return "Sin series registradas en las últimas 4 semanas.";
+
+  const setsByGroup = new Map<MuscleGroup, number>();
+  for (const set of recent) {
+    const exercise = exercises.find((e) => e.id === set.exerciseId);
+    for (const group of exercise?.muscleGroups ?? []) {
+      setsByGroup.set(group, (setsByGroup.get(group) ?? 0) + 1);
+    }
+  }
+
+  return (
+    [...setsByGroup.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([group, count]) => `${MUSCLE_LABEL[group] ?? group} ${Math.round((count / 4) * 10) / 10} series/semana`)
+      .join(", ") || "Sin series registradas en las últimas 4 semanas."
+  );
 }
 
 /**
@@ -83,12 +176,14 @@ async function buildWellbeingSummary(): Promise<string> {
  * "allowed to know" about the user, so it never has to invent anything.
  */
 export async function buildCoachContext(): Promise<CoachContext> {
-  const [profile, injuries, memory, recentSessions, exercises, nutritionSummary, wellbeingSummary] = await Promise.all([
+  const [profile, injuries, memory, recentSessions, exercises, routines, allSets, nutritionSummary, wellbeingSummary] = await Promise.all([
     getProfile(),
     listInjuries(),
     listMemoryFacts(),
     listRecentSessions(8),
     listExercises(),
+    listRoutines(),
+    listAllSets(),
     buildNutritionSummary(),
     buildWellbeingSummary(),
   ]);
@@ -128,7 +223,23 @@ export async function buildCoachContext(): Promise<CoachContext> {
   }
   const strongestLifts = prSummaries.join(" | ") || "Sin PRs todavía.";
 
-  return { profileSummary, injuriesSummary, memorySummary, recentSessionsSummary, strongestLifts, laggingMuscleGroups, nutritionSummary, wellbeingSummary };
+  const routinesSummary = buildRoutinesSummary(routines, exercises);
+  const recentSetsSummary = await buildRecentSetsSummary(recentSessions, exercises);
+  const weeklyVolumeSummary = buildWeeklyVolumeSummary(allSets, exercises);
+
+  return {
+    profileSummary,
+    injuriesSummary,
+    memorySummary,
+    recentSessionsSummary,
+    strongestLifts,
+    laggingMuscleGroups,
+    nutritionSummary,
+    wellbeingSummary,
+    routinesSummary,
+    recentSetsSummary,
+    weeklyVolumeSummary,
+  };
 }
 
 export async function suggestNextWeight(exerciseId: string): Promise<{ weight: number; reps: number; reasoning: string } | null> {

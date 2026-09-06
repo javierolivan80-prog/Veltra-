@@ -30,7 +30,7 @@ const ADDICTIONS_NAV_ITEM = { href: "/addictions", label: "Adicciones", icon: Sh
  *  marcada cuando estás dos niveles dentro (p. ej. /sleep marca "Hoy"). */
 const CATEGORY_CHILDREN: Record<string, string[]> = {
   "/dashboard": ["/sleep", "/habits", "/meditation", "/journal", "/focus", "/faith"],
-  "/routines": ["/workout", "/exercises"],
+  "/routines": ["/workout", "/exercises", "/coach"],
   "/progress": ["/history", "/weight"],
   "/profile": ["/contract"],
 };

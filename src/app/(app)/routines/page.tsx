@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, ChevronRight, Dumbbell, Play, Plus, Star } from "lucide-react";
+import { Check, ChevronRight, Dumbbell, Play, Plus, Sparkles, Star } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
@@ -142,6 +142,23 @@ export default function RoutinesPage() {
       </div>
 
       <TodayWorkoutCard />
+
+      {/* El entrenador IA existía desde el principio pero no colgaba de
+          ninguna pestaña: se llegaba a él solo por URL directa. Su sitio es
+          este — conoce las rutinas, las series y el volumen de quien pregunta. */}
+      <Link
+        href="/coach"
+        className="rounded-3xl border border-ai/30 bg-ai-bg p-5 flex items-center gap-3 hover:border-ai/50 transition-colors"
+      >
+        <span className="w-11 h-11 rounded-full bg-ai/15 flex items-center justify-center shrink-0">
+          <Sparkles size={20} className="text-ai" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-ink text-base font-semibold">Entrenador IA</span>
+          <span className="block text-ink-dim text-xs mt-0.5">Analiza tus rutinas, series y volumen — y consulta la investigación actual</span>
+        </span>
+        <ChevronRight size={18} className="text-ink-faint shrink-0" />
+      </Link>
 
       <button
         onClick={startFree}

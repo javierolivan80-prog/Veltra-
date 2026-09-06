@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Card } from "@/design-system/components/Card";
+import { CategoryBackLink } from "@/design-system/components/CategoryBackLink";
 import { EmptyState } from "@/design-system/components/EmptyState";
 import { useConversations, useCreateConversation, useDeleteConversation, useRenameConversation, useTogglePinConversation } from "@/features/coach/hooks";
 import { formatRelativeTime } from "@/lib/format";
@@ -33,6 +34,7 @@ export default function CoachListPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <CategoryBackLink href="/routines" label="Entrenamiento" />
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-ink text-2xl font-display">Entrenador IA</h1>

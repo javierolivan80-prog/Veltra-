@@ -47,6 +47,7 @@ interface CoachContext {
   recentSetsSummary?: string;
   weeklyVolumeSummary?: string;
   exerciseHistorySummary?: string;
+  todaySummary?: string;
 }
 
 function buildCoachSystemPrompt(ctx: CoachContext): string {
@@ -93,6 +94,7 @@ Si preguntan por esteroides anabólicos, SARMs, péptidos u otras sustancias rel
 Lo que no debes hacer: darles una pauta de dosis, ciclo, combinación (stacking), pauta post-ciclo (PCT) o técnica de inyección personalizada para que la sigan, ni ayudarles a conseguir las sustancias. Si piden eso explícitamente, diles que eso requiere supervisión médica real y que no se lo vas a planificar tú.
 
 CONTEXTO REAL DEL USUARIO:
+- HOY: ${ctx.todaySummary ?? "Sin datos del día de hoy."}
 - Perfil: ${ctx.profileSummary}
 - Lesiones activas: ${ctx.injuriesSummary}
 - Memoria guardada de conversaciones anteriores:

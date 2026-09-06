@@ -3,6 +3,9 @@ import { listExercises } from "@/features/exercises/repo";
 import { isRankEligible } from "@/features/exercises/ranks";
 import { getSetsForExercise, listAllSets, listRecentSessions, getExerciseIdsInSession } from "@/features/workouts/repo";
 import { listRoutines } from "@/features/routines/repo";
+import { commitmentsForDay } from "@/features/contract/arc";
+import { getActiveContract, listCommitments } from "@/features/contract/repo";
+import { todayKey } from "@/lib/date";
 import { listMemoryFacts } from "@/features/coach/repo";
 import { dayKey } from "@/features/food/dates";
 import { getDailyNutrition, getNutritionGoals } from "@/features/food/repo";
@@ -24,6 +27,55 @@ export interface CoachContext {
   recentSetsSummary: string;
   weeklyVolumeSummary: string;
   exerciseHistorySummary: string;
+  todaySummary: string;
+}
+
+/**
+ * Qué día es hoy, qué toca según el contrato y qué rutina propondría la app.
+ * Sin esto, ante un "¿qué entreno hoy?" el modelo tiene que deducir la fecha
+ * de la última sesión registrada — y se equivoca, porque no hay ningún reloj
+ * en el resto del contexto.
+ */
+async function buildTodaySummary(routines: Awaited<ReturnType<typeof listRoutines>>, recentSessions: Awaited<ReturnType<typeof listRecentSessions>>): Promise<string> {
+  const today = todayKey();
+  const fecha = new Date().toLocaleDateString("es-ES", { weekday: "long", day: "numeric", month: "long", year: "numeric" });
+  const parts = [`Hoy es ${fecha} (${today}).`];
+
+  try {
+    const contract = await getActiveContract();
+    if (contract) {
+      const commitments = await listCommitments(contract.id);
+      const hoy = commitmentsForDay(commitments, today);
+      const entrena = hoy.find((c) => c.kind === "workout");
+      parts.push(
+        entrena
+          ? `Su contrato marca entrenamiento hoy ("${entrena.title}").`
+          : hoy.length > 0
+            ? `Su contrato NO marca entrenamiento hoy; hoy le tocan: ${hoy.map((c) => c.title).join(", ")}.`
+            : "Su contrato no marca ningún compromiso hoy (día de descanso planificado)."
+      );
+    }
+  } catch {
+    // El contrato es contexto de apoyo: si falla, el resto del bloque sigue sirviendo.
+  }
+
+  // La misma rotación que propone la app en Hoy: la que lleva más tiempo sin hacerse.
+  if (routines.length > 0) {
+    const lastDoneAt = (routineId: string) => {
+      const s = recentSessions.find((x) => x.routineId === routineId);
+      return s ? new Date(s.startedAt).getTime() : 0;
+    };
+    const sugerida = [...routines].sort((a, b) => lastDoneAt(a.id) - lastDoneAt(b.id))[0];
+    parts.push(`La app propondría "${sugerida.name}" por rotación (es la que lleva más tiempo sin hacerse), pero tú puedes discrepar si los datos dicen otra cosa.`);
+  }
+
+  const ultima = recentSessions[0];
+  if (ultima) {
+    const dias = Math.floor((Date.now() - new Date(ultima.startedAt).getTime()) / 86400000);
+    parts.push(`Última sesión registrada: ${ultima.routineName ?? "sesión libre"} el ${ultima.startedAt.slice(0, 10)} (hace ${dias} ${dias === 1 ? "día" : "días"}).`);
+  }
+
+  return parts.join(" ");
 }
 
 const MUSCLE_LABEL: Record<MuscleGroup, string> = {
@@ -270,6 +322,7 @@ export async function buildCoachContext(): Promise<CoachContext> {
   const recentSetsSummary = buildRecentSetsSummary(recentSessions, exercises, allSets);
   const weeklyVolumeSummary = buildWeeklyVolumeSummary(allSets, exercises);
   const exerciseHistorySummary = buildExerciseHistorySummary(allSets, exercises);
+  const todaySummary = await buildTodaySummary(routines, recentSessions);
 
   return {
     profileSummary,
@@ -284,6 +337,7 @@ export async function buildCoachContext(): Promise<CoachContext> {
     recentSetsSummary,
     weeklyVolumeSummary,
     exerciseHistorySummary,
+    todaySummary,
   };
 }
 

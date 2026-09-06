@@ -46,6 +46,7 @@ interface CoachContext {
   routinesSummary?: string;
   recentSetsSummary?: string;
   weeklyVolumeSummary?: string;
+  exerciseHistorySummary?: string;
 }
 
 function buildCoachSystemPrompt(ctx: CoachContext): string {
@@ -74,7 +75,7 @@ REGLAS ESTRICTAS SOBRE SUS DATOS:
 - Tienes acceso a patrones cruzados entre sueño, ánimo y actividad (sección Bienestar). Si hay uno detectado y viene a cuento, apóyate en él para explicar un bajón de rendimiento o motivar un cambio concreto — no lo repitas si no aporta nada a la conversación, y nunca afirmes un patrón que no esté ahí.
 
 ANÁLISIS DE RUTINAS Y SERIES:
-Tienes sus rutinas tal y como están escritas (ejercicio, series objetivo, rango de repeticiones, descanso), sus últimas sesiones serie a serie con peso, repeticiones y RIR, y su volumen semanal por grupo muscular. Cuando te pidan analizar una rutina o su progresión, entra al detalle de verdad: si un grupo va corto o pasado de volumen, si la progresión está estancada, si el RIR indica que se queda lejos del fallo, si faltan patrones de movimiento o si el reparto entre sesiones no cuadra. Propón cambios concretos (ejercicio, series, repeticiones, carga), no consejos vagos.
+Tienes sus rutinas tal y como están escritas (ejercicio, series objetivo, rango de repeticiones, descanso), sus últimas diez sesiones serie a serie con peso, repeticiones y RIR, su volumen semanal por grupo muscular, y el historial completo de cada ejercicio desde que empezó a registrar (cuántas sesiones lleva, de qué peso salió, en cuál está, su mejor serie y cuándo lo tocó por última vez). Con eso puedes juzgar tanto lo de esta semana como si algo lleva meses parado — y decir cuándo un ejercicio hace tiempo que no aparece. Cuando te pidan analizar una rutina o su progresión, entra al detalle de verdad: si un grupo va corto o pasado de volumen, si la progresión está estancada, si el RIR indica que se queda lejos del fallo, si faltan patrones de movimiento o si el reparto entre sesiones no cuadra. Propón cambios concretos (ejercicio, series, repeticiones, carga), no consejos vagos.
 
 FORMATO — LEE ESTO CON ATENCIÓN:
 La app pinta tu respuesta como TEXTO PLANO, sin interpretar markdown. Todo lo que escribas con formato se ve literalmente como basura en pantalla.
@@ -102,6 +103,8 @@ ${ctx.routinesSummary ?? "  Sin rutinas registradas."}
 ${ctx.recentSessionsSummary}
 - Últimas sesiones serie a serie:
 ${ctx.recentSetsSummary ?? "  Sin series registradas."}
+- Historial completo por ejercicio (desde que empezó a registrar):
+${ctx.exerciseHistorySummary ?? "  Sin historial."}
 - Volumen semanal por grupo muscular (media de las últimas 4 semanas): ${ctx.weeklyVolumeSummary ?? "Sin datos de volumen."}
 - Mejores marcas actuales: ${ctx.strongestLifts}
 - Grupos musculares menos entrenados recientemente: ${ctx.laggingMuscleGroups}

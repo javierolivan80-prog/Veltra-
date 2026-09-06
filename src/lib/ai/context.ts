@@ -1,7 +1,7 @@
 import { listPersonalRecords } from "@/features/exercises/prs";
 import { listExercises } from "@/features/exercises/repo";
 import { isRankEligible } from "@/features/exercises/ranks";
-import { getSessionSets, getSetsForExercise, listAllSets, listRecentSessions, getExerciseIdsInSession } from "@/features/workouts/repo";
+import { getSetsForExercise, listAllSets, listRecentSessions, getExerciseIdsInSession } from "@/features/workouts/repo";
 import { listRoutines } from "@/features/routines/repo";
 import { listMemoryFacts } from "@/features/coach/repo";
 import { dayKey } from "@/features/food/dates";
@@ -23,6 +23,7 @@ export interface CoachContext {
   routinesSummary: string;
   recentSetsSummary: string;
   weeklyVolumeSummary: string;
+  exerciseHistorySummary: string;
 }
 
 const MUSCLE_LABEL: Record<MuscleGroup, string> = {
@@ -58,13 +59,14 @@ function buildRoutinesSummary(routines: Awaited<ReturnType<typeof listRoutines>>
  * si alguien lleva semanas moviendo el mismo peso; el resumen por sesión
  * (solo nombres de ejercicios) no da para ninguna de las tres.
  */
-async function buildRecentSetsSummary(
+function buildRecentSetsSummary(
   sessions: Awaited<ReturnType<typeof listRecentSessions>>,
-  exercises: Exercise[]
-): Promise<string> {
+  exercises: Exercise[],
+  allSets: SetEntry[]
+): string {
   const blocks: string[] = [];
-  for (const session of sessions.slice(0, 4)) {
-    const sets = (await getSessionSets(session.id)).filter((s) => !s.isWarmup);
+  for (const session of sessions.slice(0, 10)) {
+    const sets = allSets.filter((s) => s.sessionId === session.id && !s.isWarmup);
     if (sets.length === 0) continue;
 
     const byExercise = new Map<string, SetEntry[]>();
@@ -85,6 +87,45 @@ async function buildRecentSetsSummary(
     blocks.push(`  ${session.startedAt.slice(0, 10)} — ${session.routineName ?? "Sesión libre"}:\n${lines.join("\n")}`);
   }
   return blocks.join("\n") || "Sin series registradas todavía.";
+}
+
+/**
+ * TODO el historial, comprimido: una línea por ejercicio con cuántas sesiones
+ * lleva, de qué peso salió y en cuál está ahora, su mejor serie y cuándo lo
+ * tocó por última vez. Mandar cada serie de meses sería inviable, pero sin
+ * esto el coach solo ve las últimas sesiones y no puede responder a lo único
+ * que importa a medio plazo: si un ejercicio lleva meses parado.
+ */
+function buildExerciseHistorySummary(allSets: SetEntry[], exercises: Exercise[]): string {
+  const working = allSets.filter((s) => !s.isWarmup);
+  if (working.length === 0) return "Sin historial de entrenamiento todavía.";
+
+  const byExercise = new Map<string, SetEntry[]>();
+  for (const s of working) {
+    const arr = byExercise.get(s.exerciseId);
+    if (arr) arr.push(s);
+    else byExercise.set(s.exerciseId, [s]);
+  }
+
+  const lines: { lastMs: number; text: string }[] = [];
+  for (const [exerciseId, exSets] of byExercise) {
+    const name = exercises.find((e) => e.id === exerciseId)?.name ?? "Ejercicio desconocido";
+    const sorted = [...exSets].sort((a, b) => a.completedAt.localeCompare(b.completedAt));
+    const sessions = new Set(sorted.map((s) => s.sessionId)).size;
+    const best = sorted.reduce((top, s) => (s.weightKg > top.weightKg ? s : top), sorted[0]);
+    const first = sorted[0];
+    const last = sorted[sorted.length - 1];
+    lines.push({
+      lastMs: new Date(last.completedAt).getTime(),
+      text:
+        `  · ${name}: ${sessions} ${sessions === 1 ? "sesión" : "sesiones"} y ${sorted.length} series desde ${first.completedAt.slice(0, 10)}. ` +
+        `Empezó en ${first.weightKg}kg×${first.reps}, ahora ${last.weightKg}kg×${last.reps} (última vez ${last.completedAt.slice(0, 10)}). ` +
+        `Mejor serie: ${best.weightKg}kg×${best.reps}.`,
+    });
+  }
+
+  // Lo entrenado hace poco primero: es sobre lo que se suele preguntar.
+  return lines.sort((a, b) => b.lastMs - a.lastMs).map((l) => l.text).join("\n");
 }
 
 /**
@@ -180,7 +221,7 @@ export async function buildCoachContext(): Promise<CoachContext> {
     getProfile(),
     listInjuries(),
     listMemoryFacts(),
-    listRecentSessions(8),
+    listRecentSessions(20),
     listExercises(),
     listRoutines(),
     listAllSets(),
@@ -215,8 +256,10 @@ export async function buildCoachContext(): Promise<CoachContext> {
   const lagging = [...scored].sort((a, b) => a.freq - b.freq).slice(0, 3);
   const laggingMuscleGroups = lagging.map((s) => `${s.exercise.name} (${s.freq}x/semana)`).join(", ") || "Sin suficientes datos.";
 
+  // Sin tope de 8: si tiene marcas en veinte ejercicios, las veinte importan
+  // — cada línea es corta y es justo lo que se le pregunta.
   const prSummaries: string[] = [];
-  for (const ex of rankable.slice(0, 8)) {
+  for (const ex of rankable) {
     const prs = await listPersonalRecords(ex.id);
     const oneRm = prs.find((p) => p.type === "1rm");
     if (oneRm) prSummaries.push(`${ex.name}: ${oneRm.value}kg 1RM est.`);
@@ -224,8 +267,9 @@ export async function buildCoachContext(): Promise<CoachContext> {
   const strongestLifts = prSummaries.join(" | ") || "Sin PRs todavía.";
 
   const routinesSummary = buildRoutinesSummary(routines, exercises);
-  const recentSetsSummary = await buildRecentSetsSummary(recentSessions, exercises);
+  const recentSetsSummary = buildRecentSetsSummary(recentSessions, exercises, allSets);
   const weeklyVolumeSummary = buildWeeklyVolumeSummary(allSets, exercises);
+  const exerciseHistorySummary = buildExerciseHistorySummary(allSets, exercises);
 
   return {
     profileSummary,
@@ -239,6 +283,7 @@ export async function buildCoachContext(): Promise<CoachContext> {
     routinesSummary,
     recentSetsSummary,
     weeklyVolumeSummary,
+    exerciseHistorySummary,
   };
 }
 

@@ -587,3 +587,34 @@ export interface FaithCheckIn {
   createdAt: string;
   updatedAt: string;
 }
+
+// ---------------------------------------------------------------------
+// Cuerpo — Progreso: fotos de físico y su análisis por IA. Una foto por fila
+// (pose + fecha); el análisis (rango de grasa corporal, notas de masa
+// muscular) se guarda por FECHA, combinando todas las fotos de ese check-in
+// — ver src/lib/ai/physiqueClient.ts.
+// ---------------------------------------------------------------------
+
+export type PhysiquePose = "baseline" | "back_lats" | "front_double_biceps" | "back_double_biceps" | "side_triceps";
+
+export interface PhysiquePhoto {
+  id: string;
+  date: string; // local day key (YYYY-MM-DD)
+  pose: PhysiquePose;
+  dataUrl: string; // comprimida client-side, mismo criterio que FoodMessage.photos
+  createdAt: string;
+}
+
+export interface PhysiqueCheckin {
+  id: string;
+  date: string; // local day key, único por usuario
+  /** Siempre un rango, nunca un número exacto — es una estimación visual, no
+   *  una medición clínica (DEXA/plicómetro/bioimpedancia). */
+  bodyFatPctLow: number;
+  bodyFatPctHigh: number;
+  muscleNotes: string;
+  trendNotes: string | null; // null cuando no hay check-in anterior con el que comparar
+  summary: string;
+  createdAt: string;
+  updatedAt: string;
+}

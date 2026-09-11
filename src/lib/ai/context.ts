@@ -10,6 +10,7 @@ import { listMemoryFacts } from "@/features/coach/repo";
 import { dayKey } from "@/features/food/dates";
 import { getDailyNutrition, getNutritionGoals } from "@/features/food/repo";
 import { computeInsights } from "@/features/insights/signals";
+import { listPhysiqueCheckins } from "@/features/physique/repo";
 import { getProfile, listInjuries } from "@/features/profile/repo";
 import { weeklyFrequency } from "@/features/exercises/stats";
 import type { Exercise, MuscleGroup, SetEntry } from "@/types/models";
@@ -28,6 +29,7 @@ export interface CoachContext {
   weeklyVolumeSummary: string;
   exerciseHistorySummary: string;
   todaySummary: string;
+  physiqueSummary: string;
 }
 
 /**
@@ -264,12 +266,28 @@ async function buildWellbeingSummary(): Promise<string> {
 }
 
 /**
+ * Últimos check-ins de físico (grasa corporal estimada por IA) — para que el
+ * coach pueda hablar de composición corporal sin que el usuario tenga que
+ * repetir números que ya subió en Progreso. Nunca rompe el resto del
+ * contexto si el histórico falla al leerse.
+ */
+async function buildPhysiqueSummary(): Promise<string> {
+  try {
+    const checkins = await listPhysiqueCheckins();
+    if (checkins.length === 0) return "Sin check-ins de físico todavía.";
+    return checkins.slice(-5).map((c) => `${c.date}: ${c.bodyFatPctLow}-${c.bodyFatPctHigh}% (estimación visual por IA)`).join(" | ");
+  } catch {
+    return "Sin datos de físico disponibles.";
+  }
+}
+
+/**
  * Assembles the same grounded context both the edge-function prompt and the
  * offline fallback coach use — the single place that decides what the AI is
  * "allowed to know" about the user, so it never has to invent anything.
  */
 export async function buildCoachContext(): Promise<CoachContext> {
-  const [profile, injuries, memory, recentSessions, exercises, routines, allSets, nutritionSummary, wellbeingSummary] = await Promise.all([
+  const [profile, injuries, memory, recentSessions, exercises, routines, allSets, nutritionSummary, wellbeingSummary, physiqueSummary] = await Promise.all([
     getProfile(),
     listInjuries(),
     listMemoryFacts(),
@@ -279,6 +297,7 @@ export async function buildCoachContext(): Promise<CoachContext> {
     listAllSets(),
     buildNutritionSummary(),
     buildWellbeingSummary(),
+    buildPhysiqueSummary(),
   ]);
 
   const profileSummary = profile
@@ -338,6 +357,7 @@ export async function buildCoachContext(): Promise<CoachContext> {
     weeklyVolumeSummary,
     exerciseHistorySummary,
     todaySummary,
+    physiqueSummary,
   };
 }
 

@@ -10,6 +10,11 @@
 //     nutrition context and returns a reply plus a structured meal (foods and
 //     macros) to register. Text quantities take priority over the visual
 //     estimate; if too uncertain it asks a brief question instead of guessing.
+//   - "physique": Progreso — fotos de físico. Receives 1-4 pose-labeled
+//     photos + profile/previous-checkins context, returns a body-fat RANGE
+//     (never a point value — it's a visual estimate, not a clinical
+//     measurement) plus qualitative muscle notes. No local fallback exists:
+//     a failed call surfaces as an error, never a fabricated number.
 //
 // Required secrets (set via Edge Functions → Secrets):
 //   ANTHROPIC_API_KEY   — Claude API key (never exposed to the client)
@@ -48,6 +53,7 @@ interface CoachContext {
   weeklyVolumeSummary?: string;
   exerciseHistorySummary?: string;
   todaySummary?: string;
+  physiqueSummary?: string;
 }
 
 function buildCoachSystemPrompt(ctx: CoachContext): string {
@@ -74,6 +80,7 @@ REGLAS ESTRICTAS SOBRE SUS DATOS:
 - Si detectas que el usuario menciona una lesión, molestia o restricción nueva, sigue las reglas de memoria abajo.
 - Tienes acceso a lo que come (sección Nutrición). Úsalo cuando sea relevante para explicar el rendimiento o el progreso (p. ej. si lleva días muy por debajo de su objetivo de proteína o de calorías). No lo menciones si no viene a cuento.
 - Tienes acceso a patrones cruzados entre sueño, ánimo y actividad (sección Bienestar). Si hay uno detectado y viene a cuento, apóyate en él para explicar un bajón de rendimiento o motivar un cambio concreto — no lo repitas si no aporta nada a la conversación, y nunca afirmes un patrón que no esté ahí.
+- Tienes acceso a estimaciones de composición corporal (sección Físico). Son ESTIMACIONES VISUALES de una IA a partir de fotos, no mediciones clínicas (nada de DEXA, plicómetro o bioimpedancia) — trátalas como una referencia orientativa, nunca como un dato exacto, y dilo así si el usuario te pregunta directamente por el número.
 
 ANÁLISIS DE RUTINAS Y SERIES:
 Tienes sus rutinas tal y como están escritas (ejercicio, series objetivo, rango de repeticiones, descanso), sus últimas diez sesiones serie a serie con peso, repeticiones y RIR, su volumen semanal por grupo muscular, y el historial completo de cada ejercicio desde que empezó a registrar (cuántas sesiones lleva, de qué peso salió, en cuál está, su mejor serie y cuándo lo tocó por última vez). Con eso puedes juzgar tanto lo de esta semana como si algo lleva meses parado — y decir cuándo un ejercicio hace tiempo que no aparece. Cuando te pidan analizar una rutina o su progresión, entra al detalle de verdad: si un grupo va corto o pasado de volumen, si la progresión está estancada, si el RIR indica que se queda lejos del fallo, si faltan patrones de movimiento o si el reparto entre sesiones no cuadra. Propón cambios concretos (ejercicio, series, repeticiones, carga), no consejos vagos.
@@ -112,6 +119,7 @@ ${ctx.exerciseHistorySummary ?? "  Sin historial."}
 - Grupos musculares menos entrenados recientemente: ${ctx.laggingMuscleGroups}
 - Nutrición (Veltra Food): ${ctx.nutritionSummary ?? "Sin datos de nutrición."}
 - Bienestar (patrones cruzados sueño/ánimo/actividad): ${ctx.wellbeingSummary ?? "Sin datos de bienestar."}
+- Físico (estimaciones visuales de grasa corporal por IA, no clínicas): ${ctx.physiqueSummary ?? "Sin datos de físico."}
 
 MEMORIA:
 Si el usuario menciona algo importante y duradero (una lesión, una preferencia, una restricción, un objetivo nuevo), añade al final de tu respuesta un bloque exacto con este formato (el usuario nunca lo verá, se procesa aparte):
@@ -297,6 +305,92 @@ async function handleFood(body: any): Promise<Response> {
 }
 
 // ---------------------------------------------------------------------
+// Físico — fotos de progreso
+// ---------------------------------------------------------------------
+
+interface PhysiqueContext {
+  profileSummary: string;
+  previousCheckinsSummary: string;
+  posesProvidedSummary: string;
+}
+
+function buildPhysiqueSystemPrompt(ctx: PhysiqueContext): string {
+  return `Eres un entrenador con ojo clínico para composición corporal, analizando fotos de físico. Hablas en español, directo y sin rodeos, pero siempre honesto sobre los límites de lo que se puede saber a partir de una foto.
+
+REGLA MÁS IMPORTANTE — LÉELA DOS VECES:
+Lo que vas a dar es una ESTIMACIÓN VISUAL, no una medición clínica. No es un DEXA, ni un plicómetro, ni una bioimpedancia. La luz, la hidratación, el "pump" reciente, la postura y el ángulo de la cámara desplazan el resultado varios puntos porcentuales de un día a otro sin que el cuerpo haya cambiado realmente. Por eso NUNCA das un número exacto: das SIEMPRE un RANGO (bodyFatLow / bodyFatHigh), y cuanto menos fiable sea la foto (mala luz, un solo ángulo, pose parcial), MÁS ANCHO tiene que ser ese rango. Con las cuatro poses completas en buena luz, un rango de 3-4 puntos es razonable. Con una sola foto (p. ej. solo la inicial), ensancha el rango a 5-8 puntos o más si hace falta — mejor un rango honesto que un número falsamente preciso.
+
+REFERENCIA VISUAL (orientativa, ajusta por complexión individual):
+- Hombres: ~6-9% definición extrema con vascularización marcada y separación de fibras visible; ~10-14% abdominales visibles pero sin extrema definición; ~15-19% algo de definición en torso, algo de tejido en abdomen; ~20-24% sin definición visible, silueta redondeada; ~25%+ acumulación notable en cintura.
+- Mujeres: ~14-17% definición extrema, visibilidad muscular alta (poco común y exige contexto de atleta/competición); ~18-22% cintura marcada, algo de definición abdominal; ~23-27% forma en "reloj de arena" sin definición marcada; ~28-32% menos definición, más suavidad en cintura/cadera; ~33%+ acumulación notable.
+Usa esto como ancla, no como tabla rígida — el objetivo del usuario, su altura y su complexión ósea mueven la percepción.
+
+CONTEXTO DEL USUARIO:
+- Perfil: ${ctx.profileSummary}
+- Check-ins anteriores: ${ctx.previousCheckinsSummary}
+- Fotos de esta vez: ${ctx.posesProvidedSummary}
+
+QUÉ HACER CON EL CONTEXTO:
+- Ajusta el rango también según ${ctx.posesProvidedSummary.startsWith("Sin fotos") ? "nada (no debería pasar)" : "cuántas y cuáles poses hay"}: con menos poses, más ancho el rango, y dilo en las notas ("con solo la foto inicial el margen es amplio").
+- Si hay check-ins anteriores, compara y comenta la tendencia (mejora, empeora, estable) — pero NO le des importancia a una diferencia de 1-2 puntos entre check-ins: eso es ruido del propio método, no un cambio real. Solo señala tendencia si el rango se ha movido de forma consistente en varios check-ins.
+- Da 2-3 frases de feedback cualitativo de masa muscular y simetría (desarrollo, huecos, proporción) basándote en los grupos musculares que SÍ se ven en las poses proporcionadas — no inventes sobre lo que no se ve.
+- Sé constructivo pero honesto: si hay una asimetría o un grupo rezagado real, dilo con claridad, no lo suavices hasta que no sirva de nada.
+
+FORMATO — TEXTO PLANO, sin markdown (sin asteriscos, sin almohadillas, sin tablas). Frases cortas, como WhatsApp.
+
+RESPUESTA:
+Primero un mensaje breve y natural con el rango estimado y el feedback de masa muscular/simetría (y de tendencia si aplica). Después, SIEMPRE, el bloque de registro con las etiquetas <physique></physique> literales (NO uses \`\`\`json ni ningún otro envoltorio):
+<physique>{"bodyFatLow":14,"bodyFatHigh":18,"muscleNotes":"...","trendNotes":"..."}</physique>
+"trendNotes" debe ser null (sin comillas) si no hay check-in anterior con el que comparar. Nunca omitas el bloque.`;
+}
+
+function extractPhysique(text: string): { reply: string; checkin: any | null } {
+  const tag = text.match(/<physique>([\s\S]*?)<\/physique>/i);
+  if (!tag) return { reply: text.trim(), checkin: null };
+
+  let checkin: any | null = null;
+  try {
+    const parsed = JSON.parse(tag[1].trim());
+    const low = num(parsed?.bodyFatLow);
+    const high = num(parsed?.bodyFatHigh);
+    if (low > 0 && high > 0) {
+      checkin = {
+        bodyFatLow: Math.min(low, high),
+        bodyFatHigh: Math.max(low, high),
+        muscleNotes: typeof parsed?.muscleNotes === "string" ? parsed.muscleNotes : "",
+        trendNotes: typeof parsed?.trendNotes === "string" ? parsed.trendNotes : null,
+      };
+    }
+  } catch {
+    checkin = null;
+  }
+
+  const reply = text.replace(tag[0], "").trim();
+  return { reply: reply || "Análisis listo ✓", checkin };
+}
+
+async function handlePhysique(body: any): Promise<Response> {
+  const images = Array.isArray(body.images) ? body.images : [];
+  const userContent: any[] = [];
+  for (const img of images) {
+    if (img?.media_type && img?.data) {
+      if (img?.pose) userContent.push({ type: "text", text: `Foto — ${img.pose}` });
+      userContent.push({ type: "image", source: { type: "base64", media_type: img.media_type, data: img.data } });
+    }
+  }
+  userContent.push({ type: "text", text: "Analiza estas fotos de físico y da tu estimación siguiendo el formato indicado." });
+
+  const raw = await callAnthropic({
+    system: buildPhysiqueSystemPrompt(body.context),
+    maxTokens: 1200,
+    effort: "low",
+    messages: [{ role: "user", content: userContent }],
+  });
+  const { reply, checkin } = extractPhysique(raw);
+  return json({ reply, checkin });
+}
+
+// ---------------------------------------------------------------------
 // Anthropic call + helpers
 // ---------------------------------------------------------------------
 
@@ -376,6 +470,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json();
     if (body?.type === "food") return await handleFood(body);
+    if (body?.type === "physique") return await handlePhysique(body);
     return await handleCoach(body);
   } catch (err) {
     return json({ error: String(err) }, 500);

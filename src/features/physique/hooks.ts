@@ -24,7 +24,7 @@ export function usePhysiquePhotosForDate(date: string) {
 export function useAddPhysiquePhoto() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ date, pose, dataUrl }: { date: string; pose: PhysiquePose; dataUrl: string }) => repo.addPhysiquePhoto(date, pose, dataUrl),
+    mutationFn: ({ date, pose, dataUrl, id }: { date: string; pose: PhysiquePose; dataUrl: string; id?: string }) => repo.addPhysiquePhoto(date, pose, dataUrl, id),
     retry: 2,
     retryDelay: 1000,
     onSuccess: (_data, variables) => {

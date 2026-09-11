@@ -1,4 +1,4 @@
-import { listPhysiquePhotosForDate, upsertPhysiqueCheckin } from "@/features/physique/repo";
+import { listPhysiquePhotos, listPhysiquePhotosForDate, upsertPhysiqueCheckin } from "@/features/physique/repo";
 import { dataUrlToImageBlock } from "@/lib/image";
 import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
@@ -25,6 +25,14 @@ export async function analyzePhysiqueCheckin(date: string): Promise<PhysiqueChec
       return block ? { pose: p.pose, ...block } : null;
     })
     .filter((img): img is { pose: PhysiquePose; media_type: string; data: string } => img !== null);
+
+  // Además de las fotos de hoy, se manda la foto del día 1 (si existe y no es
+  // ya la que se está analizando) como referencia visual explícita: deja a la
+  // IA comparar composición corporal viendo ambas fotos a la vez, en vez de
+  // fiarse solo del resumen numérico de check-ins anteriores en el contexto.
+  const baseline = (await listPhysiquePhotos()).find((p) => p.pose === "baseline" && p.date !== date);
+  const baselineBlock = baseline ? dataUrlToImageBlock(baseline.dataUrl) : null;
+  if (baselineBlock) images.push({ pose: "baseline", ...baselineBlock });
 
   const { data, error } = await supabase.functions.invoke(AI_FUNCTION_NAME, { body: { type: "physique", images, context } });
   if (error) throw error;

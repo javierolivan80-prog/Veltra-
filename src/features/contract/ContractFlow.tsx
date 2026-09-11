@@ -4,6 +4,7 @@ import { Check, ChevronLeft } from "lucide-react";
 import { useMemo, useState } from "react";
 import { Button } from "@/design-system/components/Button";
 import { TextAreaField, TextField } from "@/design-system/components/TextField";
+import { useProfile } from "@/features/profile/hooks";
 import { cn } from "@/lib/cn";
 import { shiftDayKey, todayKey } from "@/lib/date";
 import {
@@ -72,8 +73,11 @@ export function ContractFlow({ onSubmit, submitting, error }: { onSubmit: (draft
   const [durationDays, setDurationDays] = useState(90);
   const [why, setWhy] = useState("");
 
+  const { data: profile } = useProfile();
+  const faithEnabled = !!profile?.faithEnabled;
+
   const stepIndex = STEPS.indexOf(step);
-  const templates = useMemo(() => (focus ? templatesForFocus(focus) : []), [focus]);
+  const templates = useMemo(() => (focus ? templatesForFocus(focus, { faithEnabled }) : []), [focus, faithEnabled]);
   const isPicked = (t: CommitmentTemplate) => picked.some((p) => p.kind === t.kind && (!t.custom || p.title === customTitle.trim()));
   const atMax = picked.length >= MAX_COMMITMENTS;
 

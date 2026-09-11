@@ -1,4 +1,4 @@
-import { lastNDayKeys, shiftDayKey, todayKey } from "@/lib/date";
+import { daysBetweenDayKeys, lastNDayKeys, monthEndKey, previousMonthStart, shiftDayKey, todayKey } from "@/lib/date";
 import type { Commitment, CommitmentKind, TimeSlot } from "@/types/models";
 
 export interface CommitmentStat {
@@ -73,4 +73,61 @@ export function computeReviewAggregate(
   });
 
   return { weekStart: window7[0], commitments: commitmentStats };
+}
+
+// ---------------------------------------------------------------------
+// Revisión mensual — mismo cálculo due/done, pero contra un mes natural
+// completo en vez de una ventana móvil de 7/28 días.
+// ---------------------------------------------------------------------
+
+export interface MonthlyCommitmentStat {
+  commitmentId: string;
+  kind: CommitmentKind;
+  title: string;
+  days: number[];
+  timeSlot: TimeSlot;
+  dueMonth: number;
+  doneMonth: number;
+  measurable: boolean;
+}
+
+export interface MonthlyReviewAggregate {
+  /** Day-key del primer día del mes revisado. */
+  monthStart: string;
+  commitments: MonthlyCommitmentStat[];
+}
+
+/** El mes natural completo más reciente — nunca el mes en curso, porque
+ *  todavía no ha terminado y contarlo a medias penalizaría días que aún no
+ *  han llegado. Es el `monthStart` que identifica una revisión de forma
+ *  única. */
+export function currentReviewMonthStart(referenceDate: string = todayKey()): string {
+  return previousMonthStart(referenceDate);
+}
+
+/** Agrega cada compromiso contra el mes natural que abre `monthStart`. */
+export function computeMonthlyReviewAggregate(
+  commitments: Commitment[],
+  doneDaysByKind: DoneDaysByKind,
+  monthStart: string = currentReviewMonthStart()
+): MonthlyReviewAggregate {
+  const end = monthEndKey(monthStart);
+  const window = lastNDayKeys(daysBetweenDayKeys(monthStart, end) + 1, end);
+
+  const commitmentStats: MonthlyCommitmentStat[] = commitments.map((c) => {
+    const doneDays = doneDaysByKind[c.kind] ?? new Set<string>();
+    const due = window.filter((d) => isDueOn(c.days, d));
+    return {
+      commitmentId: c.id,
+      kind: c.kind,
+      title: c.title,
+      days: c.days,
+      timeSlot: c.timeSlot,
+      dueMonth: due.length,
+      doneMonth: due.filter((d) => doneDays.has(d)).length,
+      measurable: c.kind !== "habit",
+    };
+  });
+
+  return { monthStart, commitments: commitmentStats };
 }

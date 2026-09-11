@@ -4,7 +4,6 @@ import { useEffect, useRef, useState } from "react";
 import { Button } from "@/design-system/components/Button";
 import { Dialog } from "@/design-system/components/Dialog";
 import { TextAreaField, TextField } from "@/design-system/components/TextField";
-import { errorMessage } from "@/lib/errors";
 import { useUpsertSleepLog } from "./hooks";
 import type { SleepLog } from "@/types/models";
 
@@ -47,10 +46,9 @@ export function SleepLogDialog({
     try {
       await upsert.mutateAsync({ date, bedTime, sleepTime, wakeTime, riseTime, quality, notes: notes.trim() || null });
       onOpenChange(false);
-    } catch (err) {
-      // Without this, a failed tap (auth/network hiccup, etc.) looked like the
-      // button did nothing at all, and the log was silently never saved.
-      alert(errorMessage(err, "No se pudo guardar el sueño. Inténtalo de nuevo."));
+    } catch {
+      // El toast global (MutationCache en lib/queryClient.ts) ya avisa del
+      // fallo — este catch solo evita cerrar el diálogo para poder reintentar.
     } finally {
       isSaving.current = false;
     }

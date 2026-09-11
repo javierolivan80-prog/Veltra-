@@ -78,6 +78,28 @@ export function todayFullLabel(date: Date = new Date()): string {
   return `${WEEKDAY_NAMES_ES[date.getDay()]} ${date.getDate()} de ${MONTH_NAMES_ES[date.getMonth()]}`;
 }
 
+/** First day-key (YYYY-MM-01) of the calendar month *before* the one
+ *  containing `referenceDate` — i.e. the most recently *completed* month,
+ *  the one a monthly review can talk about in full. */
+export function previousMonthStart(referenceDate: string = todayKey()): string {
+  const [y, m] = referenceDate.split("-").map(Number);
+  const date = new Date(y, m - 1, 1);
+  date.setMonth(date.getMonth() - 1);
+  return dayKey(date);
+}
+
+/** Last day-key of the calendar month that `monthStartKey` (YYYY-MM-01) opens. */
+export function monthEndKey(monthStartKey: string): string {
+  const [y, m] = monthStartKey.split("-").map(Number);
+  return dayKey(new Date(y, m, 0));
+}
+
+/** "agosto 2026" — label for a monthStart day-key. */
+export function monthLabel(monthStartKey: string): string {
+  const [y, m] = monthStartKey.split("-").map(Number);
+  return `${MONTH_NAMES_ES[m - 1]} ${y}`;
+}
+
 /** Días naturales de `from` a `to`, ambos claves de día locales. Negativo si
  *  `to` es anterior. Se redondea porque un cambio de hora mete ±1 h en la
  *  resta y convertiría 30 días exactos en 29,96. */

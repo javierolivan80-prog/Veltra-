@@ -69,6 +69,9 @@ export interface Profile {
   recoveryEnabled: boolean;
   /** Fe católica — mismo patrón que Recuperación: opcional, se activa aquí. */
   faithEnabled: boolean;
+  /** IANA tz capturada client-side en cada guardado del perfil — la usan los
+   *  avisos push que dependen de la hora local del usuario (contrato). */
+  timezone: string | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -469,30 +472,6 @@ export interface FinanceGoals {
 }
 
 // ---------------------------------------------------------------------
-// Vida — Metas a largo plazo.
-// ---------------------------------------------------------------------
-
-/** A long-term personal goal (Vida). Named `LifeGoal` to avoid colliding with
- *  the training `Goal` type ("strength" | "hypertrophy" | ...) above. */
-export interface LifeGoal {
-  id: string;
-  name: string;
-  description: string | null;
-  targetDate: string | null; // ISO date (YYYY-MM-DD)
-  createdAt: string;
-  updatedAt: string;
-}
-
-export interface GoalCheckpoint {
-  id: string;
-  goalId: string;
-  name: string;
-  done: boolean;
-  position: number;
-  createdAt: string;
-}
-
-// ---------------------------------------------------------------------
 // El contrato — el arco de 30/60/90 días que el usuario firma al empezar.
 // Un contrato activo por usuario; sus compromisos son lo que arma el plan
 // diario de Hoy.
@@ -519,7 +498,7 @@ export interface Contract {
 
 /** Tipo de bloque en Hoy. Cada compromiso se resuelve en uno de los módulos
  *  que ya existen; no hay compromisos sin sitio donde registrarse. */
-export type CommitmentKind = "workout" | "sleep" | "nutrition" | "meditation" | "journaling" | "focus" | "habit";
+export type CommitmentKind = "workout" | "sleep" | "nutrition" | "meditation" | "journaling" | "focus" | "habit" | "faith";
 
 /** Franja, no hora exacta: prometer las 07:30 cuando nadie la ha configurado
  *  es lo que hacía que Hoy dijera "ahora: entrenamiento" a las 23:00. */
@@ -573,6 +552,26 @@ export interface WeeklyReview {
 }
 
 // ---------------------------------------------------------------------
+// Revisión mensual — el mismo motor mirando un mes natural completo en vez
+// de una ventana de 7 días. Deliberadamente sin propuesta de cambio: ese es
+// el trabajo de la revisión semanal, y duplicarlo aquí sería la misma
+// mecánica dos veces con distinto nombre. En su lugar, un vistazo más largo:
+// tu punto fuerte del mes y lo que más te costó.
+// ---------------------------------------------------------------------
+
+export interface MonthlyReview {
+  id: string;
+  contractId: string;
+  /** Day-key (YYYY-MM-DD) del primer día del mes revisado. */
+  monthStart: string;
+  summary: string;
+  highlight: string | null;
+  lowlight: string | null;
+  generatedBy: ReviewGeneratedBy;
+  createdAt: string;
+}
+
+// ---------------------------------------------------------------------
 // Fe católica — un check-in por día, opcional (ver Profile.faithEnabled).
 // El examen de conciencia es texto libre y privado: sin categorías fijas
 // de faltas, cada uno lo escribe a su manera.
@@ -585,6 +584,37 @@ export interface FaithCheckIn {
   rosary: boolean;
   prayer: boolean;
   examen: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ---------------------------------------------------------------------
+// Cuerpo — Progreso: fotos de físico y su análisis por IA. Una foto por fila
+// (pose + fecha); el análisis (rango de grasa corporal, notas de masa
+// muscular) se guarda por FECHA, combinando todas las fotos de ese check-in
+// — ver src/lib/ai/physiqueClient.ts.
+// ---------------------------------------------------------------------
+
+export type PhysiquePose = "baseline" | "back_lats" | "front_double_biceps" | "back_double_biceps" | "side_triceps";
+
+export interface PhysiquePhoto {
+  id: string;
+  date: string; // local day key (YYYY-MM-DD)
+  pose: PhysiquePose;
+  dataUrl: string; // comprimida client-side, mismo criterio que FoodMessage.photos
+  createdAt: string;
+}
+
+export interface PhysiqueCheckin {
+  id: string;
+  date: string; // local day key, único por usuario
+  /** Siempre un rango, nunca un número exacto — es una estimación visual, no
+   *  una medición clínica (DEXA/plicómetro/bioimpedancia). */
+  bodyFatPctLow: number;
+  bodyFatPctHigh: number;
+  muscleNotes: string;
+  trendNotes: string | null; // null cuando no hay check-in anterior con el que comparar
+  summary: string;
   createdAt: string;
   updatedAt: string;
 }

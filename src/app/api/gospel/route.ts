@@ -39,7 +39,7 @@ function decodeEntities(text: string): string {
 // evangelio o el comentario en el primer indicio de que ha empezado ese
 // relleno de la página, en vez de arrastrarlo entero.
 const BOILERPLATE_RE =
-  /(Síguenos en|Sobre nosotros|Nuestra Difusión|Recursos\b|Newsletters?|Donativos|Todos los derechos|Política de (privacidad|cookies)|Aviso legal|Suscripción\b|Calendario Perpetuo|Idioma:)/i;
+  /(Síguenos en|Sobre nosotros|Nuestra Difusión|Recursos\b|Newsletters?|Donativos|Todos los derechos|Política de (privacidad|cookies)|Aviso legal|Suscripción\b|Suscríbete|Calendario Perpetuo|Idioma:|Cerrar\b|¿Sabes cómo se financia|Recíbelo gratis|Vídeo del Evangelio y comentario|¿Quiénes somos|¿Qué es evangeli\.net)/i;
 
 function cutAtBoilerplate(text: string): string {
   const match = text.match(BOILERPLATE_RE);
@@ -74,10 +74,17 @@ function gospelTitle(citation: string | null): string {
  * falla o el marcador no aparece, null — el cliente cae a un enlace directo
  * a la fuente, nunca se queda en blanco ni inventa contenido.
  */
-export async function GET() {
+export async function GET(request: Request) {
+  // Sin acceso a los logs de Vercel desde aquí: /api/gospel?debug=1 devuelve
+  // en qué paso falló en vez de null, para poder depurar en producción.
+  const debug = new URL(request.url).searchParams.get("debug") === "1";
+
   try {
     const res = await fetch(SOURCE_URL, { headers: { "User-Agent": "Mozilla/5.0 (compatible; VeltraBot/1.0)" }, next: { revalidate } });
-    if (!res.ok) return NextResponse.json(null);
+    if (!res.ok) {
+      if (debug) return NextResponse.json({ step: "fetch", ok: false, status: res.status, statusText: res.statusText });
+      return NextResponse.json(null);
+    }
 
     const html = await res.text();
     const $ = cheerio.load(html);
@@ -85,7 +92,10 @@ export async function GET() {
     const bodyText = decodeEntities($("body").text());
 
     const gospelMarker = bodyText.match(GOSPEL_MARKER_RE);
-    if (!gospelMarker || gospelMarker.index === undefined) return NextResponse.json(null);
+    if (!gospelMarker || gospelMarker.index === undefined) {
+      if (debug) return NextResponse.json({ step: "marker", htmlLength: html.length, bodyTextLength: bodyText.length, bodyTextSample: bodyText.slice(0, 1500) });
+      return NextResponse.json(null);
+    }
 
     const citation = gospelMarker[1].trim();
     const rest = bodyText.slice(gospelMarker.index + gospelMarker[0].length);
@@ -105,11 +115,15 @@ export async function GET() {
       commentaryAuthor = null;
     }
 
-    if (!gospelText) return NextResponse.json(null);
+    if (!gospelText) {
+      if (debug) return NextResponse.json({ step: "empty-gospel-text", citation, restSample: rest.slice(0, 1500) });
+      return NextResponse.json(null);
+    }
 
     const gospel: DailyGospel = { title: gospelTitle(citation), citation, gospelText, commentary, commentaryAuthor, sourceUrl: SOURCE_URL };
     return NextResponse.json(gospel);
-  } catch {
+  } catch (err) {
+    if (debug) return NextResponse.json({ step: "exception", message: err instanceof Error ? err.message : String(err) });
     return NextResponse.json(null);
   }
 }

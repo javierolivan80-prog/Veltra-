@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CategoryBackLink } from "@/design-system/components/CategoryBackLink";
 import { Button } from "@/design-system/components/Button";
 import { Card } from "@/design-system/components/Card";
@@ -10,6 +10,7 @@ import { StatNumber } from "@/design-system/components/StatNumber";
 import { TextField } from "@/design-system/components/TextField";
 import { LineChart } from "@/design-system/charts/LineChart";
 import { useAddBodyWeightLog, useBodyWeightLogs, useProfile, useUpdateTargetWeight } from "@/features/profile/hooks";
+import { estimateWeightGoalEta } from "@/features/profile/weightGoal";
 import { formatDateLong } from "@/lib/format";
 
 export default function WeightPage() {
@@ -31,6 +32,11 @@ export default function WeightPage() {
       ? Math.min(1, Math.max(0, (first - current) / (first - target)))
       : 0;
 
+  const goalEta = useMemo(() => {
+    if (current === null || target === null) return null;
+    return estimateWeightGoalEta(weightLogs, target, current);
+  }, [weightLogs, target, current]);
+
   const saveWeight = async () => {
     const kg = Number(weightInput);
     if (kg > 0) {
@@ -47,7 +53,7 @@ export default function WeightPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <CategoryBackLink href="/body" label="Cuerpo" />
+      <CategoryBackLink href="/progress" label="Progreso" />
       <div>
         <p className="text-ink-dim text-sm">Cuerpo</p>
         <h1 className="text-ink text-2xl font-display mt-0.5">Peso</h1>
@@ -90,6 +96,19 @@ export default function WeightPage() {
         <button onClick={() => { setGoalInput(String(target)); setShowGoalForm(true); }} className="-mt-3 text-ink-faint text-xs font-semibold self-start">
           Editar meta ({target}kg)
         </button>
+      ) : null}
+
+      {goalEta ? (
+        <Card raised>
+          <p className="text-ink-dim text-xs font-semibold uppercase tracking-wider mb-1">A este ritmo</p>
+          <p className="text-ink text-lg font-display">
+            Llegarías a tu meta el <span className="text-progress">{formatDateLong(goalEta.etaDate)}</span>
+          </p>
+          <p className="text-ink-faint text-xs mt-1">
+            {goalEta.kgPerWeek > 0 ? "+" : ""}
+            {goalEta.kgPerWeek}kg/semana · {goalEta.daysRemaining} días restantes
+          </p>
+        </Card>
       ) : null}
 
       {showGoalForm ? (

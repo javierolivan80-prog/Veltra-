@@ -107,6 +107,7 @@ export async function seedDemoData(db: IDBPDatabase<VeltraDB>) {
     targetWeightKg: null,
     recoveryEnabled: false,
     faithEnabled: false,
+    timezone: null,
     createdAt: nowIso,
     updatedAt: nowIso,
   });

@@ -120,7 +120,7 @@ export default function HabitsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <CategoryBackLink href="/mind" label="Mente" />
+      <CategoryBackLink href="/dashboard" label="Hoy" />
       <div className="flex items-center justify-between">
         <div>
           <p className="text-ink-dim text-sm">Mente</p>

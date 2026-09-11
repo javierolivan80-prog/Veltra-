@@ -1,31 +1,40 @@
 "use client";
 
-import { Book, Brain, Check, Cross, Dumbbell, Moon, Play, Target, UtensilsCrossed, X, type LucideIcon } from "lucide-react";
+import { AlertTriangle, Book, Brain, Check, Cross, Dumbbell, Lightbulb, Moon, Play, Target, UtensilsCrossed, X, type LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
 import { ShieldAlert } from "lucide-react";
 import { useApplyAutoReductions, type DoneDaysByKind } from "@/features/contract/adaptive";
-import { commitmentsForDay, dayOfArc } from "@/features/contract/arc";
-import { useFaithCheckInByDate } from "@/features/faith/hooks";
+import { ArcCompletion } from "@/features/contract/ArcCompletion";
+import { commitmentsForDay, dayOfArc, isArcOver } from "@/features/contract/arc";
+import { buildMotivationalNudges } from "@/features/contract/nudges";
+import { computePlanStreak } from "@/features/contract/streak";
+import { updateContractStatus } from "@/features/contract/repo";
+import { useFaithCheckInByDate, useFaithCheckIns } from "@/features/faith/hooks";
+import { faithDoneCount, faithDoneDays } from "@/features/faith/stats";
+import { useInsights } from "@/features/insights/hooks";
 import { InstallPrompt } from "@/features/pwa/InstallPrompt";
+import { PlanCelebration } from "@/design-system/components/PlanCelebration";
 import { KIND_HREF, SLOT_LABEL, SLOT_ORDER } from "@/features/contract/catalogue";
-import { useActiveContract, useCommitments } from "@/features/contract/hooks";
+import { contractKeys, useActiveContract, useCommitments } from "@/features/contract/hooks";
 import { popAdaptiveNotices } from "@/features/contract/notices";
+import { usePushMyProgress } from "@/features/friends/hooks";
 import { useFocusSessions } from "@/features/focus/hooks";
-import { useAllFoodMeals, useDailyNutrition } from "@/features/food/hooks";
+import { useAllFoodMeals } from "@/features/food/hooks";
 import { useJournalEntries, useJournalEntryByDate } from "@/features/journaling/hooks";
 import { useAddictions, useAllRelapses } from "@/features/addictions/hooks";
 import { currentStreakStartMs } from "@/features/addictions/stats";
 import { useMeditationSessions } from "@/features/meditation/hooks";
 import { useProfile } from "@/features/profile/hooks";
-import { useRoutines } from "@/features/routines/hooks";
 import { sleptMinutes } from "@/features/sleep/calc";
 import { useSleepLogByDate, useSleepLogs } from "@/features/sleep/hooks";
-import { useActiveSession, useRecentSessions, useStartSession } from "@/features/workouts/hooks";
+import { useRecentSessions } from "@/features/workouts/hooks";
 import { cn } from "@/lib/cn";
 import { daysBetweenDayKeys, todayKey } from "@/lib/date";
 import { formatHoursMinutes } from "@/lib/duration";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { CommitmentKind } from "@/types/models";
 
 function timeLabelOf(iso: string): { label: string; minutes: number } {
@@ -36,6 +45,7 @@ function timeLabelOf(iso: string): { label: string; minutes: number } {
 }
 
 const LAST_OPENED_KEY = "veltra:lastOpenedDay";
+const PLAN_CELEBRATED_KEY = "veltra:planCelebratedDay";
 
 /** Si han pasado dos días completos sin abrir la app, hoy se activa un modo
  *  mínimo: un solo bloque en vez del plan entero. Un par de días perdidos no
@@ -70,6 +80,7 @@ const KIND_ICON: Record<CommitmentKind, LucideIcon> = {
   journaling: Book,
   focus: Target,
   habit: Check,
+  faith: Cross,
 };
 
 // El morado es exclusivo de la IA (la revisión semanal en Progreso) — aquí
@@ -83,6 +94,7 @@ const KIND_COLOR: Record<CommitmentKind, string> = {
   journaling: "text-progress",
   focus: "text-progress",
   habit: "text-progress",
+  faith: "text-progress",
 };
 
 /** Un alto en "Tu día": hecho, en marcha, o todavía por delante. El plan lo
@@ -104,17 +116,15 @@ interface DayItem {
 
 export default function DashboardPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const today = todayKey();
   const [nowMs] = useState(() => Date.now());
   const { data: contract } = useActiveContract();
   const { data: commitments = [] } = useCommitments(contract?.id ?? null);
-  const { data: routines = [] } = useRoutines();
-  // 30 en vez de 10: además de "rutina sugerida" y "sesión de hoy", esta
-  // lista alimenta la detección de fallos de la Fase 5, que mira hasta 3
-  // semanas atrás.
+  // Entrenamiento tiene su propia pestaña — esta lista solo alimenta ya la
+  // detección de fallos de la Fase 5 (doneDaysByKind), que mira hasta 3
+  // semanas atrás, no un bloque de "empezar entrenamiento" en Hoy.
   const { data: recentSessions = [] } = useRecentSessions(30);
-  const { data: activeSession } = useActiveSession();
-  const startSession = useStartSession();
 
   const { data: lastNight } = useSleepLogByDate(today);
   const { data: allSleepLogs = [] } = useSleepLogs();
@@ -122,12 +132,13 @@ export default function DashboardPage() {
   const { data: todayJournal } = useJournalEntryByDate(today);
   const { data: allJournalEntries = [] } = useJournalEntries();
   const { data: focusSessions = [] } = useFocusSessions();
-  const { data: nutrition } = useDailyNutrition(today);
   const { data: allMeals = [] } = useAllFoodMeals();
   const { data: profile } = useProfile();
   const { data: addictions = [] } = useAddictions();
   const { data: allRelapses = [] } = useAllRelapses();
   const { data: faithCheckIn } = useFaithCheckInByDate(today);
+  const { data: allFaithCheckIns = [] } = useFaithCheckIns();
+  const { data: insights = [] } = useInsights();
 
   const returning = useReturningAfterGap(today);
   const [dismissedMinimal, setDismissedMinimal] = useState(false);
@@ -157,29 +168,25 @@ export default function DashboardPage() {
       meditation: new Set(meditationSessions.map((s) => s.completedAt.slice(0, 10))),
       focus: new Set(focusSessions.map((s) => s.completedAt.slice(0, 10))),
       journaling: new Set(allJournalEntries.map((e) => e.date)),
+      faith: faithDoneDays(allFaithCheckIns),
     }),
-    [recentSessions, allSleepLogs, allMeals, meditationSessions, focusSessions, allJournalEntries]
+    [recentSessions, allSleepLogs, allMeals, meditationSessions, focusSessions, allJournalEntries, allFaithCheckIns]
   );
   useApplyAutoReductions(commitments, doneDaysByKind);
 
-  const suggestedRoutine = useMemo(() => {
-    if (routines.length === 0) return null;
-    const lastDoneAt = (routineId: string) => {
-      const s = recentSessions.find((s) => s.routineId === routineId);
-      return s ? new Date(s.startedAt).getTime() : 0;
-    };
-    return [...routines].sort((a, b) => lastDoneAt(a.id) - lastDoneAt(b.id))[0];
-  }, [routines, recentSessions]);
-
-  const completedSessionToday = useMemo(
-    () => recentSessions.find((s) => s.status === "completed" && s.startedAt.slice(0, 10) === today) ?? null,
-    [recentSessions, today]
-  );
   const meditatedToday = useMemo(() => meditationSessions.find((s) => s.completedAt.slice(0, 10) === today) ?? null, [meditationSessions, today]);
   const focusedToday = useMemo(() => focusSessions.find((s) => s.completedAt.slice(0, 10) === today) ?? null, [focusSessions, today]);
-  const ateToday = (nutrition?.mealCount ?? 0) > 0;
 
-  const todaysCommitments = useMemo(() => commitmentsForDay(commitments, today), [commitments, today]);
+  // Entrenamiento y Comida ya tienen su propia pestaña con su propio "hoy"
+  // arriba — aquí solo queda el resto: sueño, meditación, foco, diario, fe.
+  const todaysCommitments = useMemo(
+    () => commitmentsForDay(commitments, today).filter((c) => c.kind !== "workout" && c.kind !== "nutrition"),
+    [commitments, today]
+  );
+  const motivationalNudges = useMemo(
+    () => buildMotivationalNudges(todaysCommitments, doneDaysByKind, today, contract?.why ?? null),
+    [todaysCommitments, doneDaysByKind, today, contract?.why]
+  );
 
   // Ninguna tarjeta puede ser solo una petición de datos: cuando hoy no hay
   // nada que registrar, cada una devuelve el agregado de los últimos 7 días
@@ -220,15 +227,21 @@ export default function DashboardPage() {
     return Math.max(...days);
   }, [profile?.recoveryEnabled, addictions, allRelapses]);
 
-  const faithDoneCount = (faithCheckIn?.mass ? 1 : 0) + (faithCheckIn?.rosary ? 1 : 0) + (faithCheckIn?.prayer ? 1 : 0) + (faithCheckIn?.examen ? 1 : 0);
+  const faithToday = faithDoneCount(faithCheckIn);
+  // Si Fe ya es un compromiso de hoy sale arriba, en el plan: el bloque
+  // suelto de abajo sobraría y aparecería dos veces la misma cosa.
+  const faithIsCommitment = todaysCommitments.some((c) => c.kind === "faith");
 
-  const handleStart = async () => {
-    if (activeSession) {
-      router.push(`/workout/${activeSession.id}`);
-      return;
-    }
-    const session = await startSession.mutateAsync({ routineId: suggestedRoutine?.id ?? null, routineName: suggestedRoutine?.name ?? null });
-    router.push(`/workout/${session.id}`);
+  // El arco tiene fecha de fin: pasado endsOn no queda ningún día del plan
+  // que mostrar. Antes de hoy, esto simplemente no pasaba nada — dayOfArc
+  // se quedaba clavado en durationDays y la app seguía enseñando un plan de
+  // un contrato que ya había terminado.
+  const arcOver = contract ? isArcOver(contract, today) : false;
+  const handleStartNewArc = async () => {
+    if (!contract) return;
+    await updateContractStatus(contract.id, "completed");
+    await qc.invalidateQueries({ queryKey: contractKeys.all });
+    router.push("/onboarding/contract");
   };
 
   /** Cada compromiso resuelto contra lo que el usuario ya ha registrado hoy. */
@@ -246,32 +259,6 @@ export default function DashboardPage() {
       };
 
       switch (c.kind) {
-        case "workout": {
-          if (activeSession) {
-            const { label } = timeLabelOf(activeSession.startedAt);
-            return {
-              ...base,
-              timeLabel: label,
-              kicker: "Ahora",
-              title: activeSession.routineName ?? c.title,
-              meta: "En marcha",
-              state: "now",
-              href: undefined,
-              cta: { label: "Continuar entrenamiento", onClick: () => router.push(`/workout/${activeSession.id}`) },
-            };
-          }
-          if (completedSessionToday) {
-            const { label } = timeLabelOf(completedSessionToday.startedAt);
-            return { ...base, timeLabel: label, meta: completedSessionToday.routineName ?? "Completado", state: "done", href: undefined };
-          }
-          return {
-            ...base,
-            meta: suggestedRoutine ? `${suggestedRoutine.name} · ${suggestedRoutine.exercises.length} ejercicios` : "Elige tu rutina",
-            state: "pending",
-            href: undefined,
-            cta: { label: "Empezar entrenamiento", onClick: handleStart },
-          };
-        }
         case "sleep": {
           const avgLabel = sleepAvg7dMin !== null ? `media 7d: ${formatHoursMinutes(sleepAvg7dMin)}` : null;
           return lastNight
@@ -284,10 +271,6 @@ export default function DashboardPage() {
               }
             : { ...base, meta: avgLabel ? `Sin registrar · ${avgLabel}` : "Sin registrar", state: "pending" };
         }
-        case "nutrition":
-          return ateToday
-            ? { ...base, meta: `${Math.round(nutrition?.calories ?? 0)} kcal registradas`, state: "done", href: undefined }
-            : { ...base, meta: "Sin registrar", state: "pending" };
         case "meditation": {
           const weekLabel = meditation7dMin !== null ? `7d: ${meditation7dMin} min` : null;
           return meditatedToday
@@ -306,35 +289,72 @@ export default function DashboardPage() {
             ? { ...base, timeLabel: timeLabelOf(focusedToday.completedAt).label, meta: `${focusedToday.durationMinutes} min`, state: "done", href: undefined }
             : { ...base, meta: weekLabel ? `Sin empezar · ${weekLabel}` : "Sin empezar", state: "pending" };
         }
+        case "faith":
+          // Cumple con una de las cuatro; el "X de 4" es información, no un
+          // listón que haya que completar para que el día cuente.
+          return faithToday > 0
+            ? { ...base, meta: `${faithToday} de 4 hoy`, state: "done" }
+            : { ...base, meta: "Sin registrar", state: "pending" };
         default:
           // Los hábitos propios se marcan en su módulo: aquí solo se recuerda
           // que tocan hoy.
           return { ...base, meta: "Márcalo en Hábitos", state: "pending" };
       }
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     todaysCommitments,
-    activeSession,
-    completedSessionToday,
-    suggestedRoutine,
     lastNight,
     sleepAvg7dMin,
-    ateToday,
-    nutrition,
     meditatedToday,
     meditation7dMin,
     todayJournal,
     journal7dCount,
     focusedToday,
     focus7dMin,
-    router,
+    faithToday,
   ]);
 
   const sorted = useMemo(() => [...items].sort((a, b) => a.order - b.order), [items]);
   const visibleItems = minimalMode ? sorted.slice(0, 1) : sorted;
   const doneCount = items.filter((i) => i.state === "done").length;
   const arcDay = contract ? dayOfArc(contract, today) : null;
+  const planStreak = useMemo(
+    () => (contract ? computePlanStreak(commitments, doneDaysByKind, contract.startedOn, today) : 0),
+    [contract, commitments, doneDaysByKind, today]
+  );
+
+  // Amigos (Fase 6) solo lee de friend_progress, nunca de contracts u otras
+  // tablas de módulos — así que es Hoy quien sube el resultado ya calculado
+  // en vez de ampliar el RLS de todo lo demás para que otro usuario pueda
+  // leerlo directamente.
+  const pushProgress = usePushMyProgress();
+  useEffect(() => {
+    if (!isSupabaseConfigured || !profile || !contract) return;
+    pushProgress.mutate({ displayName: profile.fullName, arcDay, arcDurationDays: contract.durationDays, streak: planStreak });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.fullName, contract?.id, arcDay, planStreak]);
+
+  // El día completo se celebra una vez y ya: recargar Hoy después no vuelve
+  // a lanzarlo, porque entonces dejaría de ser un momento y sería un cartel.
+  const [celebratedStreak, setCelebratedStreak] = useState<number | null>(null);
+  useEffect(() => {
+    if (items.length === 0 || doneCount < items.length) return;
+    let cancelled = false;
+    (async () => {
+      await Promise.resolve();
+      if (cancelled) return;
+      try {
+        if (localStorage.getItem(PLAN_CELEBRATED_KEY) === today) return;
+        localStorage.setItem(PLAN_CELEBRATED_KEY, today);
+      } catch {
+        // Sin localStorage se celebra igual; como mucho se repetiría al recargar.
+      }
+      setCelebratedStreak(computePlanStreak(commitments, doneDaysByKind, contract?.startedOn ?? today, today));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [items.length, doneCount, today, commitments, doneDaysByKind, contract?.startedOn]);
 
   return (
     <div className="flex flex-col gap-6">
@@ -355,6 +375,10 @@ export default function DashboardPage() {
         </div>
       ) : null}
 
+      {arcOver && contract ? (
+        <ArcCompletion contract={contract} commitments={commitments} doneDaysByKind={doneDaysByKind} onStartNew={handleStartNewArc} />
+      ) : (
+        <>
       <div>
         <div className="flex items-end justify-between mb-2">
           <h1 className="text-ink font-display font-semibold text-[26px] leading-tight tracking-tight">Tu día</h1>
@@ -375,6 +399,17 @@ export default function DashboardPage() {
           />
         </div>
       </div>
+
+      {motivationalNudges.length > 0 ? (
+        <div className="flex flex-col gap-2">
+          {motivationalNudges.map((nudge) => (
+            <div key={nudge.commitmentId} className="flex items-start gap-2.5 border border-warn/30 rounded-xl bg-warn/10 px-3.5 py-3">
+              <AlertTriangle size={15} className="text-warn shrink-0 mt-0.5" />
+              <p className="text-ink text-sm leading-5 flex-1">{nudge.message}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {minimalMode && sorted.length > 0 && contract?.why ? (
         <div className="border border-line-subtle rounded-2xl bg-surface px-4 py-4">
@@ -450,6 +485,8 @@ export default function DashboardPage() {
           </div>
         </div>
       )}
+        </>
+      )}
 
       {cleanDays !== null ? (
         <Link
@@ -466,17 +503,35 @@ export default function DashboardPage() {
         </Link>
       ) : null}
 
-      {profile?.faithEnabled ? (
+      {insights.length > 0 ? (
+        <div className="flex flex-col gap-2.5">
+          {insights.map((insight) => (
+            <div key={insight.id} className="flex items-start gap-3 border border-line-subtle rounded-2xl bg-bg-soft p-4">
+              <span className="w-9 h-9 rounded-full bg-progress/15 flex items-center justify-center shrink-0">
+                <Lightbulb size={16} className="text-progress" />
+              </span>
+              <div className="min-w-0">
+                <p className="text-ink-faint text-[11px] font-bold uppercase tracking-[.14em]">Patrón detectado</p>
+                <p className="text-ink-dim text-sm mt-1.5 leading-6">{insight.text}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+
+      {profile?.faithEnabled && !faithIsCommitment ? (
         <Link href="/faith" className="flex items-center gap-3 border border-line-subtle rounded-2xl bg-bg-soft p-4 hover:border-line transition-colors">
           <Cross size={16} className="text-progress shrink-0" />
           <div className="flex-1 min-w-0">
             <p className="text-ink text-[15px] font-display font-semibold">Fe</p>
-            <p className="text-ink-faint text-xs mt-0.5">{faithDoneCount} de 4 hoy</p>
+            <p className="text-ink-faint text-xs mt-0.5">{faithToday} de 4 hoy</p>
           </div>
         </Link>
       ) : null}
 
       <InstallPrompt eligible={arcDay !== null && arcDay >= 2} />
+
+      <PlanCelebration streak={celebratedStreak} onDismiss={() => setCelebratedStreak(null)} />
     </div>
   );
 }

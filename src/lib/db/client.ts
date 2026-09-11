@@ -95,6 +95,10 @@ export function getDb(): Promise<IDBPDatabase<VeltraDB>> {
         if (oldVersion < 11) {
           db.createObjectStore("monthlyReviews", { keyPath: "id" }).createIndex("contractId", "contractId");
         }
+        if (oldVersion < 12) {
+          db.createObjectStore("physiquePhotos", { keyPath: "id" }).createIndex("date", "date");
+          db.createObjectStore("physiqueCheckins", { keyPath: "id" }).createIndex("date", "date");
+        }
       },
     }).then(async (db) => {
       await seedExerciseLibrary(db);

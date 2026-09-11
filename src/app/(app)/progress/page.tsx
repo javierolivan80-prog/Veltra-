@@ -10,6 +10,7 @@ import { StatNumber } from "@/design-system/components/StatNumber";
 import { ExerciseSearchDialog } from "@/features/exercises/components/ExerciseSearchDialog";
 import { ProgressAnalysisCard } from "@/features/exercises/components/ProgressAnalysisCard";
 import { ProgressChart } from "@/features/exercises/components/ProgressChart";
+import { PhysiqueSection } from "@/features/physique/components/PhysiqueSection";
 import { useExercises, useRecentPRs } from "@/features/exercises/hooks";
 import { analyzeProgress, METRIC_UNIT, TIMEFRAMES, type ProgressMetric, type ProgressStatus, type Timeframe } from "@/features/exercises/progressAnalysis";
 import { computeRank, isRankEligible, RANK_META } from "@/features/exercises/ranks";
@@ -547,6 +548,8 @@ export default function ProgressPage() {
         {/* Intelligent analysis */}
         {analysis ? <div className="mt-4"><ProgressAnalysisCard analysis={analysis} /></div> : null}
       </div>
+
+      <PhysiqueSection />
 
       <ExerciseSearchDialog open={pickerOpen} onOpenChange={setPickerOpen} onSelect={(ex) => setSelectedId(ex.id)} />
     </div>

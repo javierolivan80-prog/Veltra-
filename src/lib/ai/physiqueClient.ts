@@ -4,6 +4,7 @@ import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { PhysiqueCheckin, PhysiquePose } from "@/types/models";
 import { AI_FUNCTION_NAME } from "./functionName";
+import { unwrapFunctionError } from "./functionError";
 import { buildPhysiqueContext } from "./physiqueContext";
 
 /**
@@ -35,7 +36,7 @@ export async function analyzePhysiqueCheckin(date: string): Promise<PhysiqueChec
   if (baselineBlock) images.push({ pose: "baseline", ...baselineBlock });
 
   const { data, error } = await supabase.functions.invoke(AI_FUNCTION_NAME, { body: { type: "physique", images, context } });
-  if (error) throw error;
+  if (error) throw await unwrapFunctionError(error);
   if (!data?.checkin) throw new Error(data?.reply || "No se pudo analizar. Inténtalo de nuevo.");
 
   return upsertPhysiqueCheckin({

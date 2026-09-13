@@ -78,6 +78,9 @@ export function useSetFaithEnabled() {
   return useMutation({
     mutationFn: (enabled: boolean) => repo.setFaithEnabled(enabled),
     onSuccess: () => qc.invalidateQueries({ queryKey: profileKeys.profile }),
+    // Este error ya se muestra inline en Perfil (setFaithEnabled.isError) —
+    // el toast global duplicaría el aviso para el mismo fallo.
+    meta: { silentGlobalError: true },
   });
 }
 

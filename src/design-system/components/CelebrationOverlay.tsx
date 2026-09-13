@@ -12,6 +12,8 @@ interface CelebrationOverlayProps {
   subtitle?: string;
   accentColor: string;
   icon: ReactNode;
+  /** El overlay nació dentro del entrenamiento; fuera de él ese texto no encaja. */
+  dismissLabel?: string;
 }
 
 function Particle({ index, color }: { index: number; color: string }) {
@@ -31,7 +33,7 @@ function Particle({ index, color }: { index: number; color: string }) {
   );
 }
 
-export function CelebrationOverlay({ open, onDismiss, eyebrow, title, subtitle, accentColor, icon }: CelebrationOverlayProps) {
+export function CelebrationOverlay({ open, onDismiss, eyebrow, title, subtitle, accentColor, icon, dismissLabel = "Seguir entrenando" }: CelebrationOverlayProps) {
   return (
     <AnimatePresence>
       {open ? (
@@ -59,7 +61,7 @@ export function CelebrationOverlay({ open, onDismiss, eyebrow, title, subtitle, 
             <h2 className="text-ink text-3xl font-display text-center mt-2">{title}</h2>
             {subtitle ? <p className="text-ink-dim text-base text-center mt-2 leading-6">{subtitle}</p> : null}
             <div className="mt-8 w-full">
-              <Button label="Seguir entrenando" onClick={onDismiss} fullWidth />
+              <Button label={dismissLabel} onClick={onDismiss} fullWidth />
             </div>
           </motion.div>
         </motion.div>

@@ -53,6 +53,7 @@ export const COMMITMENT_TEMPLATES: CommitmentTemplate[] = [
   { kind: "journaling", title: "Escribir el día", detail: "Dos líneas sobre cómo ha ido.", defaultDays: WEEKDAYS, defaultSlot: "evening" },
   { kind: "focus", title: "Un bloque de foco", detail: "Trabajo sin interrupciones, con el temporizador.", defaultDays: WEEKDAYS, defaultSlot: "morning" },
   { kind: "habit", title: "Un hábito mío", detail: "Lo defines tú: concreto y repetible.", defaultDays: WEEKDAYS, defaultSlot: "morning", custom: true },
+  { kind: "faith", title: "Vida de oración", detail: "Misa, rosario, oración o examen — al menos una cosa.", defaultDays: EVERY_DAY, defaultSlot: "evening" },
 ];
 
 /** El foco no restringe: solo pone delante lo que encaja con lo que el
@@ -64,9 +65,13 @@ const FOCUS_PRIORITY: Record<ContractFocus, CommitmentKind[]> = {
   routine: ["habit", "focus", "sleep"],
 };
 
-export function templatesForFocus(focus: ContractFocus): CommitmentTemplate[] {
+/** Fe solo se ofrece si el usuario la ha activado en Perfil — el módulo es
+ *  opcional y su promesa es que, apagado, no se le menciona en ningún sitio.
+ *  El catálogo del contrato es "ningún sitio" también. */
+export function templatesForFocus(focus: ContractFocus, { faithEnabled = false }: { faithEnabled?: boolean } = {}): CommitmentTemplate[] {
   const priority = FOCUS_PRIORITY[focus];
-  return [...COMMITMENT_TEMPLATES].sort((a, b) => {
+  const available = COMMITMENT_TEMPLATES.filter((t) => t.kind !== "faith" || faithEnabled);
+  return [...available].sort((a, b) => {
     const ai = priority.indexOf(a.kind);
     const bi = priority.indexOf(b.kind);
     return (ai === -1 ? 99 : ai) - (bi === -1 ? 99 : bi);
@@ -87,6 +92,7 @@ export const KIND_HREF: Record<CommitmentKind, string> = {
   journaling: "/journal",
   focus: "/focus",
   habit: "/habits",
+  faith: "/faith",
 };
 
 /** Cuántos días marcados tiene, dicho como lo diría una persona. */

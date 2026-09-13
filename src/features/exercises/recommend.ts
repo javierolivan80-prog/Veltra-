@@ -2,7 +2,7 @@ import { listExercises } from "@/features/exercises/repo";
 import { getSetsForExercise } from "@/features/workouts/repo";
 import { getProfile, listInjuries } from "@/features/profile/repo";
 import { weeklyFrequency } from "@/features/exercises/stats";
-import type { Exercise, StrengthPattern } from "@/types/models";
+import type { Exercise, Injury, StrengthPattern } from "@/types/models";
 
 const INJURY_PATTERN_CONFLICTS: Record<string, StrengthPattern[]> = {
   shoulder: ["vertical_press"],
@@ -13,6 +13,13 @@ const INJURY_PATTERN_CONFLICTS: Record<string, StrengthPattern[]> = {
   elbow: ["horizontal_press", "isolation"],
   wrist: ["horizontal_press"],
 };
+
+/** Which of the user's active injuries this exercise's movement pattern
+ *  conflicts with — same table the recommender uses to filter, exposed so
+ *  manual exercise pickers can warn instead of silently excluding. */
+export function conflictingInjuries(exercise: Pick<Exercise, "pattern">, activeInjuries: Injury[]): Injury[] {
+  return activeInjuries.filter((injury) => (INJURY_PATTERN_CONFLICTS[injury.area] ?? []).includes(exercise.pattern));
+}
 
 export interface Recommendation {
   exercise: Exercise;

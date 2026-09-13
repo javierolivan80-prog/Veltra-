@@ -33,6 +33,9 @@ export function useCreateContract() {
   return useMutation({
     mutationFn: (draft: ContractDraft) => repo.createContract(draft),
     onSuccess: () => qc.invalidateQueries({ queryKey: contractKeys.all }),
+    // El flujo de onboarding ya muestra este error inline (ver
+    // onboarding/contract/page.tsx) — el toast global duplicaría el aviso.
+    meta: { silentGlobalError: true },
   });
 }
 

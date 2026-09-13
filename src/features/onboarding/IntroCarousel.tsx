@@ -1,28 +1,28 @@
 "use client";
 
 import { AnimatePresence, motion } from "framer-motion";
-import { Cpu, TrendingUp, Zap } from "lucide-react";
+import { Cpu, ShieldCheck, Target } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/design-system/components/Button";
 
 const SLIDES = [
   {
-    icon: TrendingUp,
+    icon: Target,
     accent: "#2CE6A0",
-    title: "Disfruta viendo cómo progresas",
-    body: "Veltra no es una app para apuntar entrenamientos. Es la sensación de ver tu progreso, semana tras semana.",
+    title: "Un contrato de 30, 60 o 90 días",
+    body: "Eliges qué compromisos entran — entrenar, dormir, meditar, escribir — y por qué te importan. Veltra los convierte en el plan concreto de cada día.",
   },
   {
-    icon: Zap,
-    accent: "#4DA3FF",
-    title: "Registra una serie en menos de 3 segundos",
-    body: "Abre tu rutina y pulsa el ejercicio actual. Veltra recuerda tu peso, tus repeticiones y tu descanso.",
+    icon: ShieldCheck,
+    accent: "#FF9548",
+    title: "Se adapta cuando fallas, no cuando eres perfecto",
+    body: "Si un compromiso lleva dos días seguidos sin cumplirse, te avisa citando tu propia razón. Si llega a tres, baja la frecuencia sola en vez de hacer como que no ha pasado nada.",
   },
   {
     icon: Cpu,
     accent: "#A374FF",
-    title: "Tu entrenador personal con IA",
-    body: "Conoce tu historial, tus lesiones y tus objetivos reales — y celebra contigo cada récord y cada subida de rango.",
+    title: "Tu entrenador con IA cruza los datos por ti",
+    body: "Sueño, ánimo, fatiga y entrenamiento no viven en cajas separadas — si duermes peor, tu plan de mañana lo sabe antes que tú.",
   },
 ];
 

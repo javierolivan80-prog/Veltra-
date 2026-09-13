@@ -10,8 +10,10 @@ import { Stepper } from "@/design-system/components/Stepper";
 import { ExercisePickerDialog } from "@/features/exercises/ExercisePickerDialog";
 import { useExercises } from "@/features/exercises/hooks";
 import { computeRank, isRankEligible } from "@/features/exercises/ranks";
+import { usePushPrEvents } from "@/features/friends/hooks";
 import { useProfile } from "@/features/profile/hooks";
 import { useRoutine } from "@/features/routines/hooks";
+import { lastSessionSetsFor, suggestWeightAdjustment } from "@/features/workouts/difficultyAdjust";
 import {
   useAddSet,
   useDeleteExerciseFromSession,
@@ -21,11 +23,12 @@ import {
   useLastSetForExercise,
   useSession,
   useSessionSets,
+  useSetsForExercise,
 } from "@/features/workouts/hooks";
 import { primeAlerts } from "@/lib/alert";
 import { cn } from "@/lib/cn";
-import { errorMessage } from "@/lib/errors";
 import { formatDuration, formatWeight } from "@/lib/format";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { useWorkoutSessionStore } from "@/state/workoutSession.store";
 import type { Exercise, PersonalRecord, RankTier } from "@/types/models";
 
@@ -60,6 +63,7 @@ export default function ActiveWorkoutPage() {
   const { data: sessionSets = [] } = useSessionSets(sessionId ?? null);
   const { data: profile } = useProfile();
   const addSet = useAddSet();
+  const pushPrEvents = usePushPrEvents();
   const endSession = useEndSession();
   const deleteSession = useDeleteSession();
   const deleteSet = useDeleteSet();
@@ -104,6 +108,13 @@ export default function ActiveWorkoutPage() {
   );
 
   const { data: crossSessionLast } = useLastSetForExercise(current?.exerciseId ?? null, sessionId);
+  const { data: allSetsForCurrent = [] } = useSetsForExercise(current?.exerciseId ?? null);
+
+  const weightSuggestion = useMemo(() => {
+    if (!current) return null;
+    const lastSessionSets = lastSessionSetsFor(allSetsForCurrent, sessionId);
+    return suggestWeightAdjustment(lastSessionSets, current.targetRepsMin, current.targetRepsMax);
+  }, [current, allSetsForCurrent, sessionId]);
 
   useEffect(() => {
     const source = sessionSetsForCurrent.length > 0 ? sessionSetsForCurrent[sessionSetsForCurrent.length - 1] : crossSessionLast;
@@ -153,6 +164,17 @@ export default function ActiveWorkoutPage() {
 
       const oneRmPr = result.prsBroken.find((p) => p.type === "1rm");
       const exerciseFull = allExercises.find((e) => e.id === current.exerciseId);
+
+      // Amigos ve el feed de PRs aunque no entrenen este ejercicio — se sube
+      // en cuanto se rompe, antes de que ninguna celebración decida si
+      // sigue o corta con un return.
+      if (isSupabaseConfigured && exerciseFull && profile && result.prsBroken.length > 0) {
+        pushPrEvents.mutate({
+          displayName: profile.fullName,
+          events: result.prsBroken.map((pr) => ({ id: pr.id, exerciseName: exerciseFull.name, prType: pr.type, value: pr.value, achievedAt: pr.achievedAt })),
+        });
+      }
+
       if (oneRmPr && exerciseFull && profile?.bodyweightKg && isRankEligible(exerciseFull)) {
         const rankInput = { exercise: exerciseFull, bodyweightKg: profile.bodyweightKg, sex: profile.sex, birthDate: profile.birthDate, experienceLevel: profile.experienceLevel };
         const newRank = computeRank({ ...rankInput, oneRmKg: oneRmPr.value });
@@ -165,10 +187,10 @@ export default function ActiveWorkoutPage() {
 
       const best = PR_PRIORITY.map((t) => result.prsBroken.find((p) => p.type === t)).find(Boolean);
       if (best) setCelebrating(best);
-    } catch (err) {
-      // Without this, a failed tap (auth/network hiccup, etc.) looked like the
-      // button did nothing at all, and the set was silently never logged.
-      alert(errorMessage(err, "No se pudo registrar la serie. Inténtalo de nuevo."));
+    } catch {
+      // El toast global (MutationCache en lib/queryClient.ts) ya avisa del
+      // fallo — sin este catch, un tap fallido parecía que el botón no
+      // había hecho nada en absoluto.
     } finally {
       isLoggingSet.current = false;
     }
@@ -300,6 +322,17 @@ export default function ActiveWorkoutPage() {
                     </button>
                   </div>
                 ))}
+              </div>
+            ) : null}
+
+            {weightSuggestion ? (
+              <div
+                className={cn(
+                  "rounded-2xl px-4 py-3 mb-4 text-sm leading-5",
+                  weightSuggestion.direction === "increase" ? "bg-progress/10 text-progress" : weightSuggestion.direction === "decrease" ? "bg-warn/10 text-warn" : "bg-info/10 text-info"
+                )}
+              >
+                {weightSuggestion.message}
               </div>
             ) : null}
 

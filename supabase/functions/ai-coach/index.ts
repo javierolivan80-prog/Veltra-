@@ -333,6 +333,7 @@ CONTEXTO DEL USUARIO:
 QUÉ HACER CON EL CONTEXTO:
 - Ajusta el rango también según ${ctx.posesProvidedSummary.startsWith("Sin fotos") ? "nada (no debería pasar)" : "cuántas y cuáles poses hay"}: con menos poses, más ancho el rango, y dilo en las notas ("con solo la foto inicial el margen es amplio").
 - Si hay check-ins anteriores, compara y comenta la tendencia (mejora, empeora, estable) — pero NO le des importancia a una diferencia de 1-2 puntos entre check-ins: eso es ruido del propio método, no un cambio real. Solo señala tendencia si el rango se ha movido de forma consistente en varios check-ins.
+- Si entre las imágenes hay una etiquetada como "Foto de referencia (día 1)", úsala para comparar VISUALMENTE contra las fotos de hoy — distribución de grasa, definición, volumen muscular — en vez de fiarte solo del texto de check-ins anteriores. Esa foto es solo referencia: no la puntúes ni la incluyas como si fuera parte del check-in de hoy.
 - Da 2-3 frases de feedback cualitativo de masa muscular y simetría (desarrollo, huecos, proporción) basándote en los grupos musculares que SÍ se ven en las poses proporcionadas — no inventes sobre lo que no se ve.
 - Sé constructivo pero honesto: si hay una asimetría o un grupo rezagado real, dilo con claridad, no lo suavices hasta que no sirva de nada.
 
@@ -374,16 +375,20 @@ async function handlePhysique(body: any): Promise<Response> {
   const userContent: any[] = [];
   for (const img of images) {
     if (img?.media_type && img?.data) {
-      if (img?.pose) userContent.push({ type: "text", text: `Foto — ${img.pose}` });
+      const label = img?.pose === "baseline" ? "Foto de referencia (día 1) — solo para comparar, no es de hoy" : `Foto de hoy — ${img?.pose ?? "sin etiquetar"}`;
+      userContent.push({ type: "text", text: label });
       userContent.push({ type: "image", source: { type: "base64", media_type: img.media_type, data: img.data } });
     }
   }
   userContent.push({ type: "text", text: "Analiza estas fotos de físico y da tu estimación siguiendo el formato indicado." });
 
+  // effort medio (no "low" como Food): esto pasa una vez por semana, no
+  // decenas de veces al día, así que merece más razonamiento por el mismo
+  // coste práctico — y es justo la parte donde "muy buen análisis" importa más.
   const raw = await callAnthropic({
     system: buildPhysiqueSystemPrompt(body.context),
     maxTokens: 1200,
-    effort: "low",
+    effort: "medium",
     messages: [{ role: "user", content: userContent }],
   });
   const { reply, checkin } = extractPhysique(raw);

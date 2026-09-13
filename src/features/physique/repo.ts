@@ -20,10 +20,15 @@ export async function listPhysiquePhotosForDate(date: string): Promise<PhysiqueP
   });
 }
 
-export async function addPhysiquePhoto(date: string, pose: PhysiquePose, dataUrl: string): Promise<PhysiquePhoto> {
-  const photo: PhysiquePhoto = { id: generateId(), date, pose, dataUrl, createdAt: new Date().toISOString() };
+/** `id` opcional: al sustituir una foto ya subida para la misma fecha+pose,
+ *  UploadPhysiquePhotoDialog pasa el id existente para que esto la
+ *  sobrescriba (upsert por primary key) en vez de dejar un duplicado
+ *  huérfano — sin esto, "cambiar foto" añadiría una fila nueva y la vieja
+ *  seguiría mandándose a la IA junto a la nueva en el próximo análisis. */
+export async function addPhysiquePhoto(date: string, pose: PhysiquePose, dataUrl: string, id?: string): Promise<PhysiquePhoto> {
+  const photo: PhysiquePhoto = { id: id ?? generateId(), date, pose, dataUrl, createdAt: new Date().toISOString() };
   await dual({
-    cloud: async (supabase, userId) => ok(await supabase.from("physique_photos").insert({ ...toSnakeCase(photo), user_id: await userId() })),
+    cloud: async (supabase, userId) => ok(await supabase.from("physique_photos").upsert({ ...toSnakeCase(photo), user_id: await userId() })),
     local: async (db) => void (await db.put("physiquePhotos", photo)),
   });
   return photo;

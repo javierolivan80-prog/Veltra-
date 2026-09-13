@@ -1,12 +1,13 @@
 "use client";
 
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, Trash2 } from "lucide-react";
 import { useRef, useState } from "react";
 import { Button } from "@/design-system/components/Button";
 import { Dialog } from "@/design-system/components/Dialog";
-import { useAddPhysiquePhoto } from "@/features/physique/hooks";
+import { useAddPhysiquePhoto, useDeletePhysiquePhoto } from "@/features/physique/hooks";
 import { compressImage } from "@/lib/image";
-import type { PhysiquePose } from "@/types/models";
+import type { PhysiquePhoto, PhysiquePose } from "@/types/models";
+import { PHOTO_QUALITY_TIPS, PoseGuide } from "./PoseGuide";
 
 const POSE_TITLE: Record<PhysiquePose, string> = {
   baseline: "Foto inicial",
@@ -21,16 +22,24 @@ export function UploadPhysiquePhotoDialog({
   onOpenChange,
   date,
   pose,
+  existingPhoto,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   date: string;
   pose: PhysiquePose;
+  /** Cuando ya hay una foto para esta fecha+pose, el diálogo se abre en modo
+   *  edición: preview precargado, con opción de cambiarla o borrarla. El
+   *  padre monta esto con `key={date-pose}`, así que cada slot distinto es
+   *  una instancia nueva — el estado inicial parte de la foto real sin
+   *  necesitar un efecto para resincronizarlo. */
+  existingPhoto?: PhysiquePhoto | null;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(() => existingPhoto?.dataUrl ?? null);
   const [compressing, setCompressing] = useState(false);
   const addPhoto = useAddPhysiquePhoto();
+  const deletePhoto = useDeletePhysiquePhoto();
 
   const onPickFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -50,16 +59,27 @@ export function UploadPhysiquePhotoDialog({
   };
 
   const save = async () => {
-    if (!preview) return;
-    await addPhoto.mutateAsync({ date, pose, dataUrl: preview });
+    if (!preview || preview === existingPhoto?.dataUrl) return onOpenChange(false);
+    await addPhoto.mutateAsync({ date, pose, dataUrl: preview, id: existingPhoto?.id });
     setPreview(null);
     onOpenChange(false);
   };
+
+  const remove = async () => {
+    if (!existingPhoto) return;
+    await deletePhoto.mutateAsync({ id: existingPhoto.id, date: existingPhoto.date });
+    setPreview(null);
+    onOpenChange(false);
+  };
+
+  const hasChanges = preview !== null && preview !== existingPhoto?.dataUrl;
 
   return (
     <Dialog open={open} onOpenChange={close} title={POSE_TITLE[pose]}>
       <div className="flex flex-col gap-4">
         <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={onPickFile} />
+
+        {!preview ? <PoseGuide pose={pose} /> : null}
 
         {preview ? (
           // eslint-disable-next-line @next/next/no-img-element -- data URL preview, not an optimizable remote asset
@@ -82,13 +102,35 @@ export function UploadPhysiquePhotoDialog({
           </button>
         )}
 
-        {preview ? (
+        {!preview ? (
+          <ul className="flex flex-col gap-1.5">
+            {PHOTO_QUALITY_TIPS.map((tip) => (
+              <li key={tip} className="text-ink-faint text-xs leading-4 flex gap-2">
+                <span className="text-ink-faint shrink-0">·</span>
+                {tip}
+              </li>
+            ))}
+          </ul>
+        ) : (
           <button type="button" onClick={() => fileRef.current?.click()} className="text-ink-dim text-xs font-semibold self-start">
             Cambiar foto
           </button>
-        ) : null}
+        )}
 
-        <Button label="Guardar" onClick={save} loading={addPhoto.isPending} disabled={!preview} fullWidth />
+        <div className="flex flex-col sm:flex-row gap-2.5">
+          {existingPhoto ? (
+            <Button
+              label="Eliminar"
+              variant="danger"
+              icon={<Trash2 size={15} />}
+              loading={deletePhoto.isPending}
+              disabled={addPhoto.isPending}
+              onClick={remove}
+              fullWidth
+            />
+          ) : null}
+          <Button label="Guardar" onClick={save} loading={addPhoto.isPending} disabled={!hasChanges || deletePhoto.isPending} fullWidth />
+        </div>
       </div>
     </Dialog>
   );

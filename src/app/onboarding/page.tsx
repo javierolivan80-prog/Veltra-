@@ -10,6 +10,7 @@ import { ProfileSetupForm, type ProfileFormValues } from "@/features/onboarding/
 import { addInjury, getProfile, isOnboarded, upsertProfile } from "@/features/profile/repo";
 import { getDb } from "@/lib/db/client";
 import { seedDemoData } from "@/lib/db/demoData";
+import { errorMessage } from "@/lib/errors";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 type Step = "intro" | "choice" | "account" | "profile";
@@ -82,7 +83,7 @@ function OnboardingContent() {
       // por una pantalla que aún no tiene plan que enseñar.
       router.replace("/onboarding/contract");
     } catch (err) {
-      setProfileError(err instanceof Error ? err.message : "No se pudo guardar tu perfil. Inténtalo de nuevo.");
+      setProfileError(errorMessage(err, "No se pudo guardar tu perfil. Inténtalo de nuevo."));
       setSubmitting(false);
     }
   };

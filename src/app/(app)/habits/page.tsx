@@ -11,6 +11,7 @@ import { HabitFormDialog } from "@/features/habits/HabitFormDialog";
 import { useHabitLogs, useHabits, useLogHabit, useTodayHabitLogs } from "@/features/habits/hooks";
 import { computeStreaks } from "@/features/habits/stats";
 import { todayKey } from "@/lib/date";
+import { errorMessage } from "@/lib/errors";
 import { enableHabitReminders, isPushSupported, notificationPermission } from "@/lib/notifications/push";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import type { Habit, HabitLogStatus } from "@/types/models";
@@ -87,7 +88,7 @@ function NotificationsBanner() {
       await enableHabitReminders();
       setPermission("granted");
     } catch (e) {
-      setError(e instanceof Error ? e.message : "No se pudo activar.");
+      setError(errorMessage(e, "No se pudo activar."));
     } finally {
       setEnabling(false);
     }

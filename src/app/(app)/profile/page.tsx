@@ -14,6 +14,7 @@ import { useActiveContract } from "@/features/contract/hooks";
 import { EditProfileDialog } from "@/features/profile/EditProfileDialog";
 import { useAddInjury, useDeleteInjury, useInjuries, useProfile, useSetFaithEnabled, useSetRecoveryEnabled, useToggleInjury } from "@/features/profile/hooks";
 import { useCurrentStreak, useRecentSessions } from "@/features/workouts/hooks";
+import { errorMessage } from "@/lib/errors";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { useAuthStore } from "@/state/auth.store";
 
@@ -272,7 +273,7 @@ export default function ProfilePage() {
           ) : null}
           {setFaithEnabled.isError ? (
             <p className="text-danger text-xs mt-3 leading-5">
-              Error: {setFaithEnabled.error instanceof Error ? setFaithEnabled.error.message : JSON.stringify(setFaithEnabled.error)}
+              Error: {errorMessage(setFaithEnabled.error, "No se pudo guardar.")}
             </p>
           ) : null}
         </Card>

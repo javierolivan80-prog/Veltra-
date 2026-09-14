@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import { ContractFlow } from "@/features/contract/ContractFlow";
 import { useActiveContract, useCreateContract } from "@/features/contract/hooks";
 import type { ContractDraft } from "@/features/contract/repo";
+import { errorMessage } from "@/lib/errors";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { useAuthStore } from "@/state/auth.store";
 
@@ -27,7 +28,7 @@ export default function ContractOnboardingPage() {
       await createContract.mutateAsync(draft);
       router.replace("/dashboard");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "No se pudo guardar tu contrato. Inténtalo de nuevo.");
+      setError(errorMessage(err, "No se pudo guardar tu contrato. Inténtalo de nuevo."));
     }
   };
 

@@ -6,7 +6,7 @@ import { Chip } from "@/design-system/components/Chip";
 import { Dialog } from "@/design-system/components/Dialog";
 import { SegmentedControl } from "@/design-system/components/SegmentedControl";
 import { TextAreaField, TextField } from "@/design-system/components/TextField";
-import { useCreateExercise, useUpdateExercise } from "@/features/exercises/hooks";
+import { useCreateExercise, useExercises, useUpdateExercise } from "@/features/exercises/hooks";
 import type { Equipment, Exercise, MuscleGroup, StrengthPattern } from "@/types/models";
 
 const MUSCLE_OPTIONS: { value: MuscleGroup; label: string }[] = [
@@ -62,6 +62,7 @@ export function ExerciseFormDialog({
 }) {
   const createExercise = useCreateExercise();
   const updateExercise = useUpdateExercise();
+  const { data: allExercises = [] } = useExercises();
 
   const [name, setName] = useState(initial?.name ?? "");
   const [muscleGroups, setMuscleGroups] = useState<MuscleGroup[]>(initial?.muscleGroups ?? []);
@@ -84,7 +85,12 @@ export function ExerciseFormDialog({
     setList(list.includes(value) ? list.filter((v) => v !== value) : [...list, value]);
   };
 
-  const canSubmit = name.trim().length > 0 && muscleGroups.length > 0 && equipment.length > 0;
+  // Sin este aviso, crear sin querer un ejercicio con el mismo nombre parte
+  // el historial en dos: las series viejas se quedan colgando del original
+  // y ni el peso sugerido ni la gráfica de progreso vuelven a verlas.
+  const duplicate = !initial ? allExercises.find((e) => e.name.trim().toLowerCase() === name.trim().toLowerCase()) : undefined;
+
+  const canSubmit = name.trim().length > 0 && muscleGroups.length > 0 && equipment.length > 0 && !duplicate;
   const submitting = createExercise.isPending || updateExercise.isPending;
 
   const submit = async () => {
@@ -102,7 +108,12 @@ export function ExerciseFormDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange} title={initial ? "Editar ejercicio" : "Nuevo ejercicio"}>
       <div className="flex flex-col gap-6">
-        <TextField label="Nombre del ejercicio" placeholder="p. ej. Press inclinado con barra" value={name} onChange={(e) => setName(e.target.value)} />
+        <div>
+          <TextField label="Nombre del ejercicio" placeholder="p. ej. Press inclinado con barra" value={name} onChange={(e) => setName(e.target.value)} />
+          {duplicate ? (
+            <p className="text-danger text-xs mt-1.5">Ya tienes un ejercicio llamado &quot;{duplicate.name}&quot; — búscalo y úsalo, o cambia el nombre de este.</p>
+          ) : null}
+        </div>
 
         <div>
           <p className="text-ink-dim text-sm font-medium mb-2">Grupo muscular</p>

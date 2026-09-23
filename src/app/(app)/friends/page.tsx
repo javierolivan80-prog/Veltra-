@@ -9,6 +9,7 @@ import { EmptyState } from "@/design-system/components/EmptyState";
 import { TextField } from "@/design-system/components/TextField";
 import { useFriendPrFeed, useFriends, useMyInviteCode, useRedeemInviteCode } from "@/features/friends/hooks";
 import type { PrType } from "@/features/friends/repo";
+import { errorMessage } from "@/lib/errors";
 import { formatRelativeTime } from "@/lib/format";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
@@ -113,7 +114,7 @@ export default function FriendsPage() {
         ) : null}
         {codeError ? (
           <p className="text-danger text-xs mt-3 leading-5">
-            No se pudo generar tu código: {codeErrorDetail instanceof Error ? codeErrorDetail.message : "error desconocido"}. Recarga la página para
+            No se pudo generar tu código: {errorMessage(codeErrorDetail, "error desconocido")}. Recarga la página para
             reintentarlo.
           </p>
         ) : null}
@@ -134,7 +135,7 @@ export default function FriendsPage() {
         </div>
         {redeem.isError ? (
           <p className="text-danger text-xs mt-3 leading-5">
-            {redeem.error instanceof Error ? redeem.error.message : "No se pudo añadir. Inténtalo de nuevo."}
+            {errorMessage(redeem.error, "No se pudo añadir. Inténtalo de nuevo.")}
           </p>
         ) : null}
       </Card>

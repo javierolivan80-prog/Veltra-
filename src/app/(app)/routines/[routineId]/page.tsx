@@ -7,13 +7,14 @@ import { Button } from "@/design-system/components/Button";
 import { Card } from "@/design-system/components/Card";
 import { useExercises } from "@/features/exercises/hooks";
 import { useDeleteRoutine, useRoutine } from "@/features/routines/hooks";
-import { useStartSession } from "@/features/workouts/hooks";
+import { useActiveSession, useStartSession } from "@/features/workouts/hooks";
 
 export default function RoutineDetailPage() {
   const params = useParams<{ routineId: string }>();
   const router = useRouter();
   const { data: routine } = useRoutine(params.routineId ?? null);
   const { data: exercises = [] } = useExercises();
+  const { data: activeSession } = useActiveSession();
   const startSession = useStartSession();
   const deleteRoutine = useDeleteRoutine();
 
@@ -21,7 +22,15 @@ export default function RoutineDetailPage() {
 
   const exerciseName = (id: string) => exercises.find((e) => e.id === id)?.name ?? "Ejercicio";
 
+  // Como en routines/page.tsx: solo puede haber una sesión activa a la vez —
+  // sin esto, reabrir la app y volver a pulsar "Empezar" aquí creaba una
+  // sesión nueva y vacía mientras la de verdad (con series ya registradas)
+  // se quedaba huérfana, sin terminar y sin aparecer en el historial.
   const handleStart = async () => {
+    if (activeSession) {
+      router.push(`/workout/${activeSession.id}`);
+      return;
+    }
     const session = await startSession.mutateAsync({ routineId: routine.id, routineName: routine.name });
     router.push(`/workout/${session.id}`);
   };

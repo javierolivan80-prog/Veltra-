@@ -56,8 +56,9 @@ function TodayWorkoutCard() {
     router.push(`/workout/${session.id}`);
   };
 
-  if (!dueToday) return null;
-
+  // Reanudar una sesión activa no depende de si hoy "toca" entrenar según el
+  // contrato — un entreno extra, o un día sin commitments configurados,
+  // dejaba esta tarjeta entera sin pintarse y la sesión parecía perdida.
   if (activeSession) {
     return (
       <div className="rounded-2xl border border-progress/25 bg-progress-bg p-4">
@@ -73,6 +74,8 @@ function TodayWorkoutCard() {
       </div>
     );
   }
+
+  if (!dueToday) return null;
 
   if (completedToday) {
     return (

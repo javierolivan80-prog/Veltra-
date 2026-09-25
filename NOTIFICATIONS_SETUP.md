@@ -195,3 +195,47 @@ Para probarlo: cambia `NUDGE_TIME` en
 futuro, redespliega, y deja pasar 3 días sin registrar nada en ningún
 módulo primero (con 0, 1 o 2 días no hay nada que avisar todavía). Para
 desactivar: `select cron.unschedule('send-reengagement-nudge');`
+
+## 9. Aviso real de fin de descanso durante un entrenamiento
+
+Quinta función, y la única que no espera a una hora fija: RestTimer.tsx ya
+avisa dentro de la propia pestaña (sonido/vibración/notificación local),
+pero eso depende de que el navegador siga ejecutando su JS — con la
+pantalla bloqueada o Safari en segundo plano un rato, se congela y el
+aviso llega tarde, solo al reabrir la app. Esta función es la red de
+seguridad: cada vez que empieza un descanso, el cliente programa una fila
+en `rest_alerts` (migración 0018) con la hora exacta en que termina; el
+cron revisa esa cola cada minuto y manda un push real por las que ya han
+llegado a su hora — llega aunque la pestaña esté dormida, con hasta ~60s
+de margen por la granularidad del cron. Si el descanso se cancela o se
+sustituye antes de tiempo, el cliente borra la fila solo — no hace falta
+nada especial en Supabase para eso.
+
+Necesita la migración 0018 aplicada y los mismos secretos VAPID del paso 3:
+
+```
+supabase db push
+supabase functions deploy send-rest-alerts
+```
+
+Y el cron:
+
+```sql
+select cron.schedule(
+  'send-rest-alerts',
+  '* * * * *',
+  $$
+  select net.http_post(
+    url := 'https://<project-ref>.supabase.co/functions/v1/send-rest-alerts',
+    headers := jsonb_build_object('Authorization', 'Bearer <anon-key>', 'Content-Type', 'application/json'),
+    body := '{}'::jsonb
+  );
+  $$
+);
+```
+
+Para probarlo: con las notificaciones ya activadas (paso 5), empieza un
+entrenamiento, registra una serie para arrancar el descanso, y bloquea la
+pantalla del móvil. El push debería llegar poco después de que el
+descanso termine (hasta un minuto de margen). Para desactivar:
+`select cron.unschedule('send-rest-alerts');`
